@@ -358,52 +358,42 @@ export default function HomePage() {
             style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.12)' }}
           >
             {/*
-              Pixel-accurate positioning using measured image data:
-              - questionmark.png is 2387×3814px
-              - Dot centre is at x=941 (39.4% from left), y=3799 (99.6% from top)
-              - Rendered at height=268, width=168:
-                  dot_x = 168 × 0.394 = 66px from image left
-                  dot_y ≈ 268 × 0.85 = 228px (visual gap centre, not the 2px pixel dot)
-              - For dot to land at card horizontal centre:
-                  image must be placed at left = 50% - 66px
-              - Logo at left:50% of outer container = card centre = dot_x ✓
-              - Logo top = 24(pt-6) + 228(dot_y) - 44(half logo height) = 208px
-            */}
-            <div className="relative w-full pt-6" style={{ height: 310 }}>
+              The questionmark.png has a ~130px blank gap baked in between the hook body
+              and its 2px rendered dot. Absolute positioning into that void never works.
 
-              {/* Question mark — shifted so its dot aligns with card horizontal centre */}
+              Solution: crop the image via overflow:hidden to show only the hook body
+              (top 175px of 268px = 65% = just past where the body curl ends at ~63%).
+              Then place the 4 Pines logo directly below with a natural dot-gap.
+              Both are in a flex-col items-center, so both are at the card horizontal
+              centre — perfectly aligned with TRIVIA TUESDAY below.
+            */}
+            <div className="flex flex-col items-center pt-6 pb-3">
+
+              {/* Question mark body — cropped, blank gap removed */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.55, delay: 2.1 }}
-                style={{ position: 'absolute', left: 'calc(50% - 66px)', top: 0 }}
+                style={{ width: 168, height: 175, overflow: 'hidden' }}
               >
                 <Image
                   src="/questionmark.png"
                   alt=""
                   height={268}
                   width={168}
-                  className="object-contain"
-                  style={{ opacity: 0.93 }}
+                  style={{ display: 'block', opacity: 0.93 }}
                   priority
                 />
               </motion.div>
 
-              {/*
-                4 Pines logo — card centre horizontally (left:50%), dot-gap vertically.
-                top: 208px = pt-6(24) + image_dot_gap_centre(228) - half_logo(44)
-              */}
+              {/* Natural dot-gap — same visual weight as real ? typography */}
+              <div style={{ height: 22 }} />
+
+              {/* 4 Pines logo as the dot */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.45, delay: 2.4, ease: [0.22, 0.61, 0.36, 1] }}
-                style={{
-                  position: 'absolute',
-                  top: 208,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  zIndex: 10,
-                }}
               >
                 <Image src="/4Pines_Logo_Colour_circle.png" alt="4 Pines Brewing" width={88} height={88} className="object-contain drop-shadow-xl" />
               </motion.div>
@@ -413,7 +403,7 @@ export default function HomePage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 2.3 }}
-              className="px-5 pt-4 pb-2 text-center" style={{ lineHeight: 0.88 }}
+              className="px-5 pt-3 pb-2 text-center" style={{ lineHeight: 0.88 }}
             >
               {['TRIVIA','TUESDAY'].map(w => (
                 <div key={w} className="text-white font-black uppercase" style={{ fontFamily: 'var(--font-jost)', fontSize: 'clamp(2.8rem, 8vw, 5.2rem)', letterSpacing: '-0.02em' }}>{w}</div>
