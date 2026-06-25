@@ -191,8 +191,11 @@ create policy "host full access pool_scores" on pool_scores
   for all to authenticated using (true) with check (true);
 
 -- ─── Realtime ─────────────────────────────────────────────────────────────────
--- After running this SQL, also enable Realtime on trivia_live_state in:
--- Supabase Dashboard → Database → Replication → Tables → trivia_live_state
+-- Free tier — no Pro account needed.
+-- This adds trivia_live_state to the supabase_realtime publication so that
+-- both the control panel and the display screen get instant push updates.
+
+alter publication supabase_realtime add table trivia_live_state;
 
 -- ─── Storage ──────────────────────────────────────────────────────────────────
 -- Create a "trivia-media" bucket in Supabase Dashboard → Storage
