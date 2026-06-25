@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand palette */
+  --color-snow: #F7F4ED;
+  --color-snow-card: #FFFFFF;
+  --color-navy: #1B2A3C;
+  --color-pine: #23402F;
+  --color-timber: #9C7A52;
+  --color-rust: #C8552D;
+  --color-mustard: #E0A53C;
+
+  /* Fonts */
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bebas), 'Bebas Neue', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background-color: var(--color-snow);
+  color: var(--color-navy);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Show screen overrides — applied when <html> has data-show="true" */
+[data-show="true"] body {
+  background-color: var(--color-navy);
+  color: white;
+}
