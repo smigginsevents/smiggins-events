@@ -198,12 +198,14 @@ function PoolWordAnimation() {
       await new Promise(r => setTimeout(r, 180))
 
       // ── Orange rolls in from left → right edge just touches yellow ────────
+      // ease: 'linear' = arrives at full rolling speed, NOT slowing before impact.
+      // The collision itself is what stops it, not the easing curve.
       const oTravel = Math.abs(START_X - ORANGE_CONTACT_X)  // 696px
       await oCtrl.start({
         x: ORANGE_CONTACT_X,
         rotate: deg(oTravel),
         opacity: 1,
-        transition: { duration: 0.78, ease: [0.22, 0.61, 0.36, 1] },
+        transition: { duration: 0.78, ease: 'linear' },
       })
 
       // ── IMPACT ────────────────────────────────────────────────────────────
@@ -356,18 +358,25 @@ export default function HomePage() {
             style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.12)' }}
           >
             {/*
-              The question mark + 4 Pines logo are in a SINGLE full-width relative container.
-              The ? image is centred via flex.
-              The 4 Pines logo is positioned absolute relative to that FULL-WIDTH container
-              so left:50% aligns it with the card centre — and therefore with TRIVIA below.
+              Pixel-accurate positioning using measured image data:
+              - questionmark.png is 2387×3814px
+              - Dot centre is at x=941 (39.4% from left), y=3799 (99.6% from top)
+              - Rendered at height=268, width=168:
+                  dot_x = 168 × 0.394 = 66px from image left
+                  dot_y ≈ 268 × 0.85 = 228px (visual gap centre, not the 2px pixel dot)
+              - For dot to land at card horizontal centre:
+                  image must be placed at left = 50% - 66px
+              - Logo at left:50% of outer container = card centre = dot_x ✓
+              - Logo top = 24(pt-6) + 228(dot_y) - 44(half logo height) = 208px
             */}
-            <div className="relative flex justify-center px-6 pt-6" style={{ height: 290 }}>
+            <div className="relative w-full pt-6" style={{ height: 310 }}>
 
-              {/* Question mark */}
+              {/* Question mark — shifted so its dot aligns with card horizontal centre */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.55, delay: 2.1 }}
+                style={{ position: 'absolute', left: 'calc(50% - 66px)', top: 0 }}
               >
                 <Image
                   src="/questionmark.png"
@@ -381,9 +390,8 @@ export default function HomePage() {
               </motion.div>
 
               {/*
-                4 Pines logo — positioned relative to the OUTER full-width div.
-                left:50% + translateX(-50%) = perfectly centred with the card & TRIVIA text.
-                bottom keeps the same vertical spot as before (at the dot of the ?).
+                4 Pines logo — card centre horizontally (left:50%), dot-gap vertically.
+                top: 208px = pt-6(24) + image_dot_gap_centre(228) - half_logo(44)
               */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.5 }}
@@ -391,7 +399,7 @@ export default function HomePage() {
                 transition={{ duration: 0.45, delay: 2.4, ease: [0.22, 0.61, 0.36, 1] }}
                 style={{
                   position: 'absolute',
-                  bottom: 6,
+                  top: 208,
                   left: '50%',
                   transform: 'translateX(-50%)',
                   zIndex: 10,
