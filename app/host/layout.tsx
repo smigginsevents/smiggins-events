@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { SignOutButton } from './SignOutButton'
 
 export default async function HostLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) redirect('/host/login')
+  // Login page lives inside this layout segment — render it without host chrome.
+  // The proxy.ts middleware already redirects unauthenticated users away from
+  // all other /host/** routes, so we don't need to redirect here too.
+  if (!user) return <>{children}</>
 
   return (
     <div className="min-h-screen flex flex-col bg-snow">
