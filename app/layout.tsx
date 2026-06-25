@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter, Bebas_Neue, Jost, Dancing_Script } from 'next/font/google'
+import { Inter, Bebas_Neue, Jost, Great_Vibes } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({
@@ -22,10 +22,10 @@ const jost = Jost({
   display: 'swap',
 })
 
-const dancingScript = Dancing_Script({
+const greatVibes = Great_Vibes({
   variable: '--font-dancing',
+  weight: '400',
   subsets: ['latin'],
-  weight: ['400', '600'],
   display: 'swap',
 })
 
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${bebasNeue.variable} ${jost.variable} ${dancingScript.variable} h-full`}>
+    <html lang="en" className={`${inter.variable} ${bebasNeue.variable} ${jost.variable} ${greatVibes.variable} h-full`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   )
