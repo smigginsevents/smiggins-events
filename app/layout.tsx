@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter, Bebas_Neue } from 'next/font/google'
+import { Inter, Bebas_Neue, Jost, Dancing_Script } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({
@@ -15,6 +15,20 @@ const bebasNeue = Bebas_Neue({
   display: 'swap',
 })
 
+const jost = Jost({
+  variable: '--font-jost',
+  subsets: ['latin'],
+  weight: ['400', '600', '700', '800', '900'],
+  display: 'swap',
+})
+
+const dancingScript = Dancing_Script({
+  variable: '--font-dancing',
+  subsets: ['latin'],
+  weight: ['400', '600'],
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'Smiggins Events',
   description: 'Tuesday Trivia Night & Monday Pool Comp at Smiggins Hotel',
@@ -27,7 +41,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${bebasNeue.variable} h-full`}>
+    <html lang="en" className={`${inter.variable} ${bebasNeue.variable} ${jost.variable} ${dancingScript.variable} h-full`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   )
