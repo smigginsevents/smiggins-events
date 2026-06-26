@@ -4,16 +4,153 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import {
-  addPlayerToTournament,
-  removePlayerFromTournament,
-  generateDraw,
-  recordWinner,
-  generateNextRound,
-  completeTournament,
-  type GeneratedMatch,
-} from '@/app/actions/pool'
+import { createClient } from '@/lib/supabase/client'
+import type { GeneratedMatch } from '@/app/actions/pool'
 import { Button } from '@/components/ui/Button'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// All DB operations use the browser client directly (avoids server action
+// serialisation issues that caused the infinite-spinner bug on create).
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function dbGetOrCreatePlayer(name: string): Promise<{ id: string; name: string }> {
+  const supabase = createClient()
+  const trimmed = name.trim()
+  const { data: existing } = await supabase
+    .from('pool_players').select('id, name').ilike('name', trimmed).single()
+  if (existing) return existing
+  const { data, error } = await supabase
+    .from('pool_players').insert({ name: trimmed }).select('id, name').single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+async function dbAddEntry(tournamentId: string, player: { id: string; name: string }) {
+  const supabase = createClient()
+  await supabase.from('pool_tournament_entries')
+    .insert({ tournament_id: tournamentId, player_id: player.id })
+}
+
+async function dbRemoveEntry(tournamentId: string, playerId: string) {
+  const supabase = createClient()
+  await supabase.from('pool_tournament_entries')
+    .delete().eq('tournament_id', tournamentId).eq('player_id', playerId)
+}
+
+async function dbGenerateDraw(tournamentId: string, playerEntries: Array<{ id: string; name: string }>): Promise<GeneratedMatch[]> {
+  const supabase = createClient()
+  // Fisher-Yates shuffle
+  const players = [...playerEntries]
+  for (let i = players.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [players[i], players[j]] = [players[j], players[i]]
+  }
+
+  const matchRows: any[] = []
+  let matchNum = 0
+  for (let i = 0; i < players.length; i += 2) {
+    matchNum++
+    const tableNum = ((matchNum - 1) % 2) + 1
+    const isBye = i + 1 >= players.length
+    matchRows.push({
+      tournament_id: tournamentId,
+      round_number: 1,
+      match_number: matchNum,
+      table_number: tableNum,
+      player1_id: players[i].id,
+      player2_id: isBye ? null : players[i + 1].id,
+      is_bye: isBye,
+      status: isBye ? 'complete' : 'pending',
+      winner_id: isBye ? players[i].id : null,
+    })
+  }
+
+  const { error } = await supabase.from('pool_matches').insert(matchRows)
+  if (error) throw new Error(error.message)
+
+  // Update draw_order + tournament status
+  for (let i = 0; i < players.length; i++) {
+    await supabase.from('pool_tournament_entries')
+      .update({ draw_order: i + 1 })
+      .eq('tournament_id', tournamentId).eq('player_id', players[i].id)
+  }
+  await supabase.from('pool_tournaments').update({ status: 'active' }).eq('id', tournamentId)
+
+  return matchRows.map((m, idx) => ({
+    round_number: m.round_number,
+    match_number: m.match_number,
+    table_number: m.table_number,
+    player1_id: m.player1_id,
+    player1_name: players.find(p => p.id === m.player1_id)?.name ?? '',
+    player2_id: m.player2_id,
+    player2_name: m.player2_id ? (players.find(p => p.id === m.player2_id)?.name ?? '') : null,
+    is_bye: m.is_bye,
+  }))
+}
+
+async function dbRecordWinner(matchId: string, winnerId: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('pool_matches')
+    .update({ winner_id: winnerId, status: 'complete' }).eq('id', matchId)
+  if (error) throw new Error(error.message)
+}
+
+async function dbGenerateNextRound(
+  tournamentId: string,
+  currentRound: number,
+  currentMatches: Match[],
+  maxMatchNum: number,
+): Promise<GeneratedMatch[]> {
+  const supabase = createClient()
+  const winners = currentMatches
+    .sort((a, b) => a.matchNumber - b.matchNumber)
+    .map(m => m.winner!)
+
+  if (winners.length <= 1) {
+    await supabase.from('pool_tournaments').update({ status: 'complete' }).eq('id', tournamentId)
+    return []
+  }
+
+  const nextRound = currentRound + 1
+  const rows: any[] = []
+  let matchNum = maxMatchNum
+
+  for (let i = 0; i < winners.length; i += 2) {
+    matchNum++
+    const tableNum = ((rows.length) % 2) + 1
+    const isBye = i + 1 >= winners.length
+    rows.push({
+      tournament_id: tournamentId,
+      round_number: nextRound,
+      match_number: matchNum,
+      table_number: tableNum,
+      player1_id: winners[i].id,
+      player2_id: isBye ? null : winners[i + 1].id,
+      is_bye: isBye,
+      status: isBye ? 'complete' : 'pending',
+      winner_id: isBye ? winners[i].id : null,
+    })
+  }
+
+  const { error } = await supabase.from('pool_matches').insert(rows)
+  if (error) throw new Error(error.message)
+
+  return rows.map(m => ({
+    round_number: m.round_number,
+    match_number: m.match_number,
+    table_number: m.table_number,
+    player1_id: m.player1_id,
+    player1_name: winners.find(w => w.id === m.player1_id)?.name ?? '',
+    player2_id: m.player2_id,
+    player2_name: m.player2_id ? (winners.find(w => w.id === m.player2_id)?.name ?? '') : null,
+    is_bye: m.is_bye,
+  }))
+}
+
+async function dbCompleteTournament(tournamentId: string) {
+  const supabase = createClient()
+  await supabase.from('pool_tournaments').update({ status: 'complete' }).eq('id', tournamentId)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -210,18 +347,25 @@ function DrawReveal({ matches, onDone }: { matches: GeneratedMatch[]; onDone: ()
 function MatchCard({ match, tournamentId, onWinnerRecorded }: {
   match: Match; tournamentId: string; onWinnerRecorded: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [saving, setSaving] = useState(false)
   const [localWinner, setLocalWinner] = useState<string | null>(match.winner?.id ?? null)
 
   async function selectWinner(playerId: string) {
+    if (saving) return
+    setSaving(true)
     setLocalWinner(playerId)
-    startTransition(async () => {
-      await recordWinner(match.id, playerId)
+    try {
+      await dbRecordWinner(match.id, playerId)
       onWinnerRecorded()
-    })
+    } catch (e: any) {
+      alert('Error saving winner: ' + e.message)
+      setLocalWinner(null)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const isComplete = match.status === 'complete'
+  const isComplete = match.status === 'complete' || !!localWinner
   const tableColor = match.tableNumber === 1 ? '#E8820A' : '#E8CC00'
 
   if (match.isBye) {
@@ -245,7 +389,7 @@ function MatchCard({ match, tournamentId, onWinnerRecorded }: {
       {/* Player 1 */}
       <button
         onClick={() => !isComplete && selectWinner(match.player1!.id)}
-        disabled={isComplete || pending || !match.player1}
+        disabled={isComplete || saving || !match.player1}
         className="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
         style={{
           background: localWinner === match.player1?.id ? 'rgba(34,160,80,0.1)' : 'transparent',
@@ -261,7 +405,7 @@ function MatchCard({ match, tournamentId, onWinnerRecorded }: {
       {/* Player 2 */}
       <button
         onClick={() => !isComplete && selectWinner(match.player2!.id)}
-        disabled={isComplete || pending || !match.player2}
+        disabled={isComplete || saving || !match.player2}
         className="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
         style={{
           background: localWinner === match.player2?.id ? 'rgba(34,160,80,0.1)' : 'transparent',
@@ -285,7 +429,6 @@ export function TournamentManager({ tournament, entries, allPlayers, matches }: 
   const [localMatches, setLocalMatches] = useState(matches)
   const [drawMatches, setDrawMatches] = useState<GeneratedMatch[] | null>(null)
   const [showDraw, setShowDraw] = useState(false)
-  const [isPending, startTransition] = useTransition()
   const [drawLoading, setDrawLoading] = useState(false)
   const [nextRoundLoading, setNextRoundLoading] = useState(false)
   const [completingTournament, setCompletingTournament] = useState(false)
@@ -299,31 +442,37 @@ export function TournamentManager({ tournament, entries, allPlayers, matches }: 
   async function addPlayer(playerName: string) {
     const trimmed = playerName.trim()
     if (!trimmed) return
-    const optimistic: Entry = { playerId: 'pending-' + Date.now(), name: trimmed }
-    setLocalEntries(prev => [...prev, optimistic])
     setSearch('')
-    startTransition(async () => {
-      await addPlayerToTournament(tournament.id, trimmed)
-      router.refresh()
-    })
+    try {
+      const player = await dbGetOrCreatePlayer(trimmed)
+      if (!enteredIds.has(player.id)) {
+        await dbAddEntry(tournament.id, player)
+        setLocalEntries(prev => [...prev, { playerId: player.id, name: player.name }])
+      }
+    } catch (e: any) {
+      alert('Could not add player: ' + e.message)
+    }
   }
 
   async function removePlayer(playerId: string) {
     setLocalEntries(prev => prev.filter(e => e.playerId !== playerId))
-    startTransition(async () => {
-      await removePlayerFromTournament(tournament.id, playerId)
-    })
+    try {
+      await dbRemoveEntry(tournament.id, playerId)
+    } catch { /* silently ignore */ }
   }
 
   async function handleGenerateDraw() {
     setDrawLoading(true)
     try {
-      const generated = await generateDraw(tournament.id)
+      const playerList = localEntries
+        .filter(e => !e.playerId.startsWith('pending-'))
+        .map(e => ({ id: e.playerId, name: e.name }))
+      const generated = await dbGenerateDraw(tournament.id, playerList)
       setDrawMatches(generated)
       setShowDraw(true)
       setStatus('active')
     } catch (e: any) {
-      alert(e.message)
+      alert('Draw failed: ' + e.message)
     } finally {
       setDrawLoading(false)
     }
@@ -332,17 +481,18 @@ export function TournamentManager({ tournament, entries, allPlayers, matches }: 
   async function handleNextRound() {
     setNextRoundLoading(true)
     try {
-      const generated = await generateNextRound(tournament.id)
+      const maxMatchNum = localMatches.length > 0 ? Math.max(...localMatches.map(m => m.matchNumber)) : 0
+      const generated = await dbGenerateNextRound(tournament.id, currentRound, currentRoundMatches, maxMatchNum)
       if (generated.length === 0) {
-        // Tournament completed
         setStatus('complete')
+        router.refresh()
       } else {
         setDrawMatches(generated)
         setShowDraw(true)
+        router.refresh()
       }
-      router.refresh()
     } catch (e: any) {
-      alert(e.message)
+      alert('Error: ' + e.message)
     } finally {
       setNextRoundLoading(false)
     }
@@ -350,17 +500,23 @@ export function TournamentManager({ tournament, entries, allPlayers, matches }: 
 
   async function handleCompleteTournament() {
     setCompletingTournament(true)
-    await completeTournament(tournament.id)
-    setStatus('complete')
-    router.refresh()
+    try {
+      await dbCompleteTournament(tournament.id)
+      setStatus('complete')
+      router.refresh()
+    } catch (e: any) {
+      alert('Error: ' + e.message)
+    } finally {
+      setCompletingTournament(false)
+    }
   }
 
-  // Compute bracket state from local matches
+  // Compute bracket state from local matches (used by handleNextRound above too)
   const rounds = [...new Set(localMatches.map(m => m.roundNumber))].sort((a, b) => a - b)
   const currentRound = rounds.length > 0 ? Math.max(...rounds) : 0
   const currentRoundMatches = localMatches.filter(m => m.roundNumber === currentRound)
   const allCurrentRoundDone = currentRoundMatches.length > 0 &&
-    currentRoundMatches.every(m => m.status === 'complete')
+    currentRoundMatches.every(m => m.status === 'complete' || m.isBye)
   const currentRoundWinners = currentRoundMatches.filter(m => m.winner).map(m => m.winner!)
   const isFinalOver = allCurrentRoundDone && currentRoundWinners.length === 1
 
