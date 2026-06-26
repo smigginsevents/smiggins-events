@@ -39,8 +39,8 @@ export default async function HostDashboard() {
           <Link href="/host/trivia/new">
             <Button variant="secondary" size="sm">+ New Trivia</Button>
           </Link>
-          <Link href="/host/pool/new">
-            <Button variant="ghost" size="sm">+ New Pool Comp</Button>
+          <Link href="/host/pool/knockout/new">
+            <Button variant="ghost" size="sm">+ New Pool Knockout</Button>
           </Link>
         </div>
       </div>
@@ -63,20 +63,26 @@ export default async function HostDashboard() {
         )}
       </section>
 
-      {/* Pool Comp Events */}
+      {/* Pool Knockout Tournaments */}
       <section>
-        <h2 className="text-sm font-semibold text-timber uppercase tracking-wider mb-4">Pool Comp Nights</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-timber uppercase tracking-wider">Pool Knockout</h2>
+          <Link href="/host/pool/knockout" className="text-xs text-navy/50 hover:text-navy underline underline-offset-2">View all</Link>
+        </div>
 
         {(poolEvents ?? []).length === 0 ? (
           <p className="text-navy/40 text-sm py-8 text-center border border-dashed border-timber/30 rounded-xl">
-            No pool comp events yet.{' '}
-            <Link href="/host/pool/new" className="text-rust underline underline-offset-2">Create one</Link>
+            No knockout tournaments yet.{' '}
+            <Link href="/host/pool/knockout/new" className="text-rust underline underline-offset-2">Start tonight&apos;s draw</Link>
           </p>
         ) : (
           <div className="flex flex-col gap-3">
             {(poolEvents as PoolEvent[]).map((event) => (
               <PoolEventRow key={event.id} event={event} />
             ))}
+            <Link href="/host/pool/knockout" className="text-center text-navy/40 text-xs py-2 hover:text-navy transition-colors">
+              View all knockout tournaments →
+            </Link>
           </div>
         )}
       </section>

@@ -1,94 +1,239 @@
-import { Suspense } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import type { LeaderboardEntry } from '@/lib/types'
-import { PoolLeaderboardClient } from './LeaderboardClient'
 
-async function getThisWeekLeaderboard(): Promise<LeaderboardEntry[]> {
+// ─────────────────────────────────────────────────────────────────────────────
+// Server-side data fetching
+// ─────────────────────────────────────────────────────────────────────────────
+async function getLeaderboard() {
   const supabase = await createClient()
 
-  const { data: events } = await supabase
-    .from('pool_events')
-    .select('id')
-    .in('status', ['live', 'complete'])
-    .order('event_date', { ascending: false })
-    .limit(1)
-
-  if (!events || events.length === 0) return []
-
-  const eventId = events[0].id
-  const { data: scores } = await supabase
-    .from('pool_scores')
-    .select('team_id, points, teams(name)')
-    .eq('event_id', eventId)
-    .order('points', { ascending: false })
-
-  if (!scores) return []
-
-  return scores.map((s: any, i) => ({
-    team_id: s.team_id,
-    team_name: s.teams?.name ?? 'Unknown',
-    total_points: s.points,
-    rank: i + 1,
-  }))
-}
-
-async function getAllTimeLeaderboard(): Promise<LeaderboardEntry[]> {
-  const supabase = await createClient()
-
-  const { data: scores } = await supabase
-    .from('pool_scores')
-    .select('team_id, points, pool_events(status), teams(name)')
-
-  if (!scores) return []
-
-  const completed = scores.filter((s: any) => s.pool_events?.status === 'complete')
-
-  const totals = completed.reduce<Record<string, { name: string; pts: number }>>((acc, s: any) => {
-    if (!acc[s.team_id]) acc[s.team_id] = { name: s.teams?.name ?? 'Unknown', pts: 0 }
-    acc[s.team_id].pts += Number(s.points)
-    return acc
-  }, {})
-
-  return Object.entries(totals)
-    .sort(([, a], [, b]) => b.pts - a.pts)
-    .map(([teamId, val], i) => ({
-      team_id: teamId,
-      team_name: val.name,
-      total_points: val.pts,
-      rank: i + 1,
-    }))
-}
-
-export default async function PoolPage() {
-  const [thisWeek, allTime] = await Promise.all([
-    getThisWeekLeaderboard(),
-    getAllTimeLeaderboard(),
+  const [
+    { data: players },
+    { data: matches },
+    { data: tournaments },
+  ] = await Promise.all([
+    supabase.from('pool_players').select('id, name'),
+    supabase.from('pool_matches').select('player1_id, player2_id, winner_id, tournament_id, round_number, status, is_bye'),
+    supabase.from('pool_tournaments').select('id, status'),
   ])
 
+  if (!players) return []
+
+  const completedIds = new Set(
+    (tournaments ?? []).filter(t => t.status === 'complete').map(t => t.id)
+  )
+
+  // Find tournament winner: winner of the highest-round match in a completed tournament
+  const winnerByTournament = new Map<string, string>()
+  for (const tid of completedIds) {
+    const tMatches = (matches ?? []).filter(m => m.tournament_id === tid && m.status === 'complete' && !m.is_bye)
+    if (!tMatches.length) continue
+    const maxRound = Math.max(...tMatches.map(m => m.round_number))
+    const finals = tMatches.filter(m => m.round_number === maxRound)
+    if (finals.length === 1 && finals[0].winner_id) {
+      winnerByTournament.set(tid, finals[0].winner_id)
+    }
+  }
+
+  const stats = players.map(player => {
+    const played = (matches ?? []).filter(
+      m => !m.is_bye && m.status === 'complete' && (m.player1_id === player.id || m.player2_id === player.id)
+    )
+    const gamesWon  = played.filter(m => m.winner_id === player.id).length
+    const gamesLost = played.filter(m => m.winner_id !== player.id).length
+    const compWins  = [...winnerByTournament.values()].filter(w => w === player.id).length
+
+    return { id: player.id, name: player.name, compWins, gamesWon, gamesLost }
+  })
+
+  return stats
+    .filter(s => s.gamesWon + s.gamesLost > 0 || s.compWins > 0)
+    .sort((a, b) => {
+      if (b.compWins  !== a.compWins)  return b.compWins  - a.compWins
+      if (b.gamesWon  !== a.gamesWon)  return b.gamesWon  - a.gamesWon
+      return a.gamesLost - b.gamesLost
+    })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pool ball letters (static, no animation)
+// ─────────────────────────────────────────────────────────────────────────────
+const BS = 48
+
+function StaticBall({ hue }: { hue: 'orange' | 'yellow' }) {
+  const base  = hue === 'orange' ? '#E8820A' : '#E8CC00'
+  const light = hue === 'orange' ? '#FFCA6A' : '#FFF08A'
+  const dark  = hue === 'orange' ? '#7A3800' : '#967E00'
+  const num   = hue === 'orange' ? '5' : '1'
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-navy text-white px-6 py-4 flex items-center gap-4">
-        <Link href="/" className="text-white/60 hover:text-white transition-colors text-sm">← Home</Link>
-        <span className="font-display text-2xl tracking-wide">POOL COMP</span>
-      </header>
-
-      <main className="flex-1 bg-snow py-12 px-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-2">
-            <h1 className="text-3xl font-semibold text-navy">Monday Night Pool Comp</h1>
-            <p className="text-navy/50 text-sm mt-1">Every Monday · Smiggins Hotel</p>
-          </div>
-
-          <Suspense fallback={null}>
-            <PoolLeaderboardClient thisWeek={thisWeek} allTime={allTime} />
-          </Suspense>
+    <div style={{
+      width: BS, height: BS, borderRadius: '50%', flexShrink: 0, position: 'relative',
+      background: `radial-gradient(circle at 33% 28%, ${light} 0%, ${base} 52%, ${dark} 100%)`,
+      boxShadow: `inset -3px -4px 10px rgba(0,0,0,0.4), inset 3px 3px 6px rgba(255,255,255,0.22), 0 4px 14px rgba(0,0,0,0.5)`,
+    }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{
+          width: BS * 0.48, height: BS * 0.48, borderRadius: '50%', background: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: BS * 0.26, fontWeight: 900, color: '#1a1a1a', fontFamily: 'var(--font-jost)', lineHeight: 1 }}>{num}</span>
         </div>
-      </main>
+      </div>
+    </div>
+  )
+}
 
-      <footer className="bg-pine text-white/50 py-6 px-6 text-center text-xs">
-        Smiggins Hotel · Charlotte Pass, NSW
-      </footer>
+function PoolLogo() {
+  const letterSx: React.CSSProperties = {
+    fontFamily: 'var(--font-jost)',
+    fontWeight: 900,
+    color: 'white',
+    letterSpacing: '-0.02em',
+    lineHeight: 1,
+    fontSize: '2.8rem',
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <Image src="/smigginslogo-white.png" alt="Smiggins" width={100} height={50} className="object-contain mb-2" />
+      <div className="flex items-center" style={{ gap: 3 }}>
+        <span style={letterSx}>P</span>
+        <StaticBall hue="orange" />
+        <StaticBall hue="yellow" />
+        <span style={letterSx}>L</span>
+      </div>
+      <div style={{ ...letterSx, fontSize: '1.6rem', letterSpacing: '0.25em', marginTop: 2 }}>COMP</div>
+      <p style={{ fontFamily: 'var(--font-jost)', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', marginTop: 6, letterSpacing: '0.08em' }}>
+        Season Leaderboard
+      </p>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
+export default async function PoolLeaderboardPage() {
+  const rows = await getLeaderboard()
+
+  return (
+    <div className="relative min-h-screen flex flex-col">
+      {/* Background photo */}
+      <div className="fixed inset-0 -z-10">
+        <Image src="/Pool-Comp-webBG.jpg" alt="" fill className="object-cover object-center" priority />
+        {/* Deep blue overlay */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(15,35,65,0.72) 0%, rgba(10,25,55,0.85) 100%)' }} />
+      </div>
+
+      <div className="flex-1 flex flex-col items-center px-4 py-10 max-w-4xl mx-auto w-full">
+
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <PoolLogo />
+        </div>
+
+        {/* Table */}
+        {rows.length === 0 ? (
+          <div className="text-white/40 text-center py-16" style={{ fontFamily: 'var(--font-jost)' }}>
+            <p className="text-xl mb-2">No results yet</p>
+            <p className="text-sm">Check back after Monday night!</p>
+          </div>
+        ) : (
+          <div className="w-full rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            {/* Column headers */}
+            <div className="grid px-5 py-3" style={{
+              gridTemplateColumns: '56px 1fr 110px 90px 90px',
+              background: 'rgba(0,0,0,0.35)',
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+            }}>
+              {['Rank', 'Player', 'Comp Wins', 'Won', 'Lost'].map(h => (
+                <div key={h} className="text-center first:text-left" style={{
+                  fontFamily: 'var(--font-jost)', fontSize: '0.7rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase',
+                }}>{h}</div>
+              ))}
+            </div>
+
+            {/* Data rows */}
+            {rows.map((row, idx) => {
+              const isTop3 = idx < 3
+              const rowBg = idx % 2 === 0
+                ? 'rgba(255,255,255,0.04)'
+                : 'rgba(0,0,0,0.15)'
+
+              return (
+                <div
+                  key={row.id}
+                  className="grid items-center px-5 py-4"
+                  style={{
+                    gridTemplateColumns: '56px 1fr 110px 90px 90px',
+                    background: rowBg,
+                    borderBottom: idx < rows.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                  }}
+                >
+                  {/* Rank */}
+                  <div className="flex items-center">
+                    <span style={{
+                      fontFamily: 'var(--font-jost)',
+                      fontSize: isTop3 ? '2rem' : '1.4rem',
+                      fontWeight: 900,
+                      color: isTop3 ? 'white' : 'rgba(255,255,255,0.5)',
+                      lineHeight: 1,
+                    }}>
+                      {idx + 1}
+                    </span>
+                  </div>
+
+                  {/* Player name */}
+                  <div style={{
+                    fontFamily: 'var(--font-jost)',
+                    fontSize: '0.95rem',
+                    fontWeight: isTop3 ? 700 : 500,
+                    color: 'white',
+                  }}>
+                    {row.name}
+                    {row.compWins > 0 && (
+                      <span style={{ marginLeft: 8, fontSize: '0.75rem', color: '#E8CC00' }}>
+                        {'★'.repeat(Math.min(row.compWins, 5))}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Comp Wins */}
+                  <div className="text-center" style={{
+                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontWeight: 700, color: row.compWins > 0 ? '#E8CC00' : 'rgba(255,255,255,0.5)',
+                  }}>
+                    {row.compWins}
+                  </div>
+
+                  {/* Games Won */}
+                  <div className="text-center" style={{
+                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontWeight: 600, color: 'rgba(255,255,255,0.85)',
+                  }}>
+                    {row.gamesWon}
+                  </div>
+
+                  {/* Games Lost */}
+                  <div className="text-center" style={{
+                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontWeight: 400, color: 'rgba(255,255,255,0.45)',
+                  }}>
+                    {row.gamesLost}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <Link href="/" className="mt-8 text-white/30 hover:text-white/60 text-xs transition-colors" style={{ fontFamily: 'var(--font-jost)' }}>
+          ← Back to Events
+        </Link>
+      </div>
     </div>
   )
 }

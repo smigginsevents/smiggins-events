@@ -93,6 +93,45 @@ export interface PoolScore {
   points: number
 }
 
+// ─── Pool Knockout ─────────────────────────────────────────────────────────────
+
+export interface PoolPlayer {
+  id: string
+  name: string
+  created_at: string
+}
+
+export interface PoolTournament {
+  id: string
+  name: string
+  event_date: string
+  status: 'setup' | 'active' | 'complete'
+  created_at: string
+}
+
+export interface PoolTournamentEntry {
+  id: string
+  tournament_id: string
+  player_id: string
+  draw_order: number | null
+}
+
+export type MatchStatus = 'pending' | 'active' | 'complete'
+
+export interface PoolMatch {
+  id: string
+  tournament_id: string
+  round_number: number
+  match_number: number
+  table_number: 1 | 2
+  player1_id: string | null
+  player2_id: string | null
+  is_bye: boolean
+  winner_id: string | null
+  status: MatchStatus
+  created_at: string
+}
+
 // ─── Leaderboard aggregates ───────────────────────────────────────────────────
 
 export interface LeaderboardEntry {
