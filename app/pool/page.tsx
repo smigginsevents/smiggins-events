@@ -123,8 +123,8 @@ export default async function PoolLeaderboardPage() {
       {/* Background photo */}
       <div className="fixed inset-0 -z-10">
         <Image src="/Pool-Comp-webBG.jpg" alt="" fill className="object-cover object-center" priority />
-        {/* Deep blue overlay */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(15,35,65,0.72) 0%, rgba(10,25,55,0.85) 100%)' }} />
+        {/* Deep blue overlay — keep it light enough to see the photo */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(12,28,58,0.52) 0%, rgba(8,18,44,0.62) 100%)' }} />
       </div>
 
       <div className="flex-1 flex flex-col items-center px-4 py-10 max-w-4xl mx-auto w-full">
@@ -141,12 +141,12 @@ export default async function PoolLeaderboardPage() {
             <p className="text-sm">Check back after Monday night!</p>
           </div>
         ) : (
-          <div className="w-full rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <div className="w-full rounded-2xl overflow-hidden" style={{ background: 'rgba(4,10,30,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }}>
             {/* Column headers */}
             <div className="grid px-5 py-3" style={{
               gridTemplateColumns: '56px 1fr 110px 90px 90px',
-              background: 'rgba(0,0,0,0.35)',
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(0,0,0,0.28)',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
               {['Rank', 'Player', 'Comp Wins', 'Won', 'Lost'].map(h => (
                 <div key={h} className="text-center first:text-left" style={{
@@ -160,8 +160,8 @@ export default async function PoolLeaderboardPage() {
             {rows.map((row, idx) => {
               const isTop3 = idx < 3
               const rowBg = idx % 2 === 0
-                ? 'rgba(255,255,255,0.04)'
-                : 'rgba(0,0,0,0.15)'
+                ? 'rgba(255,255,255,0.03)'
+                : 'rgba(0,0,0,0.1)'
 
               return (
                 <div
@@ -170,7 +170,7 @@ export default async function PoolLeaderboardPage() {
                   style={{
                     gridTemplateColumns: '56px 1fr 110px 90px 90px',
                     background: rowBg,
-                    borderBottom: idx < rows.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                    borderBottom: idx < rows.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                   }}
                 >
                   {/* Rank */}
