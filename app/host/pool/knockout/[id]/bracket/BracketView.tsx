@@ -66,7 +66,6 @@ function buildLayout(matches: Match[]) {
   }
 
   const r1Count = (byRound[rounds[0]] ?? []).length
-  const totalH  = Math.max(r1Count * SLOT_H, SLOT_H)
 
   const layout: LayoutMatch[] = []
   for (const round of rounds) {
@@ -82,6 +81,11 @@ function buildLayout(matches: Match[]) {
       })
     })
   }
+
+  // Compute totalH from actual match positions — late arrivals in later rounds
+  // can place matches below the round-1-derived height, so we measure reality.
+  const maxCenterY = layout.length > 0 ? Math.max(...layout.map(m => m.centerY)) : SLOT_H
+  const totalH = maxCenterY + CARD_H + VS_GAP / 2 + MATCH_GAP
 
   const maxRound = rounds[rounds.length - 1]
   const totalW   = maxRound * ROUND_W + CARD_W
@@ -317,13 +321,16 @@ function PlayerCard({
 
 // ─── Single bracket match ─────────────────────────────────────────────────────
 function BracketMatchCard({
-  match, visible, initialAnim, onSelectWinner,
+  match, visible, initialAnim, onSelectWinner, onResetWinner,
 }: {
   match: LayoutMatch; visible: boolean; initialAnim: boolean
   onSelectWinner: (match: LayoutMatch, player: Player) => void
+  onResetWinner:  (match: LayoutMatch) => void
 }) {
+  const [hovering, setHovering] = useState(false)
   const isComplete = match.status === 'complete' || !!match.winner
   const canSelect  = !isComplete && !!match.player1 && (!!match.player2 || match.isBye)
+  const canReset   = isComplete && !match.isBye  // don't reset byes
 
   const p1Win = isComplete && match.winner?.id === match.player1?.id
   const p2Win = isComplete && match.winner?.id === match.player2?.id
@@ -347,6 +354,8 @@ function BracketMatchCard({
           initial={initialAnim ? { opacity: 0 } : false}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.12 }}
+          onMouseEnter={() => setHovering(true)}
+          onMouseLeave={() => setHovering(false)}
           style={{
             position: 'absolute',
             left: match.x,
@@ -357,21 +366,40 @@ function BracketMatchCard({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '0 16px',
-            pointerEvents: 'none',
           }}
         >
-          <span style={{ fontFamily: 'var(--font-jost)', fontSize: 9, fontStyle: 'italic', color: 'rgba(255,255,255,0.22)', letterSpacing: '0.08em' }}>
+          <span style={{ fontFamily: 'var(--font-jost)', fontSize: 9, fontStyle: 'italic', color: 'rgba(255,255,255,0.22)', letterSpacing: '0.08em', pointerEvents: 'none' }}>
             {match.isBye ? 'bye' : 'vs'}
           </span>
-          {!match.isBye && (
-            <span style={{
-              fontFamily: 'var(--font-jost)', fontSize: 8.5, fontWeight: 700, letterSpacing: '0.14em',
-              color: match.tableNumber === 1 ? '#E8820A' : '#C8A800',
-              background: match.tableNumber === 1 ? 'rgba(232,130,10,0.15)' : 'rgba(200,168,0,0.15)',
-              borderRadius: 4, padding: '1px 6px',
-            }}>
-              T{match.tableNumber}
-            </span>
+
+          {/* Reset button — shown on hover for completed real matches */}
+          {canReset && hovering ? (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={() => onResetWinner(match)}
+              style={{
+                background: 'rgba(220,50,50,0.18)',
+                border: '1px solid rgba(220,50,50,0.35)',
+                borderRadius: 4, padding: '1px 7px',
+                fontFamily: 'var(--font-jost)', fontSize: 8, fontWeight: 700,
+                letterSpacing: '0.12em', color: 'rgba(255,120,120,0.9)',
+                cursor: 'pointer',
+              }}
+            >
+              ↺ RESET
+            </motion.button>
+          ) : (
+            !match.isBye && (
+              <span style={{
+                fontFamily: 'var(--font-jost)', fontSize: 8.5, fontWeight: 700, letterSpacing: '0.14em',
+                color: match.tableNumber === 1 ? '#E8820A' : '#C8A800',
+                background: match.tableNumber === 1 ? 'rgba(232,130,10,0.15)' : 'rgba(200,168,0,0.15)',
+                borderRadius: 4, padding: '1px 6px', pointerEvents: 'none',
+              }}>
+                T{match.tableNumber}
+              </span>
+            )
           )}
         </motion.div>
       )}
@@ -625,6 +653,48 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
     setTimeout(() => setSvgKey(k => k + 1), 80)
   }
 
+  // ── Reset winner (undo a result, cascade-delete subsequent rounds) ─────────
+  const handleResetWinner = useCallback(async (match: LayoutMatch) => {
+    if (selecting) return
+    if (!confirm(`Reset this result and clear all subsequent rounds?\nThis allows you to pick a different winner.`)) return
+    setSelecting(true)
+    try {
+      const supabase = createClient()
+
+      // Reset the match itself to pending
+      await supabase
+        .from('pool_matches')
+        .update({ winner_id: null, status: 'pending' })
+        .eq('id', match.id)
+
+      // Delete every match in rounds after this one — they'll be re-generated
+      await supabase
+        .from('pool_matches')
+        .delete()
+        .eq('tournament_id', tournament.id)
+        .gt('round_number', match.roundNumber)
+
+      // If the tournament was marked complete, revert it to active
+      await supabase
+        .from('pool_tournaments')
+        .update({ status: 'active' })
+        .eq('id', tournament.id)
+        .eq('status', 'complete')
+
+      // Update local state
+      setMatches(prev =>
+        prev
+          .filter(m => m.roundNumber <= match.roundNumber)
+          .map(m => m.id === match.id ? { ...m, winner: null, status: 'pending' } : m)
+      )
+      setTimeout(() => setSvgKey(k => k + 1), 80)
+    } catch (e: any) {
+      alert('Error resetting result: ' + e.message)
+    } finally {
+      setSelecting(false)
+    }
+  }, [selecting, tournament.id])
+
   // ── Late arrival: add player ───────────────────────────────────────────────
   async function handleAddLatePlayer(playerName: string) {
     const trimmed = playerName.trim()
@@ -815,9 +885,9 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
       <Background />
       <Branding name={tournament.name} date={formattedDate} />
 
-      {/* Exit button — subtle top left */}
+      {/* Exit button — goes to tournament list */}
       <Link
-        href={`/host/pool/knockout/${tournament.id}`}
+        href="/host/pool/knockout"
         style={{
           position: 'fixed', top: 18, left: 20, zIndex: 40,
           fontFamily: 'var(--font-jost)', fontSize: 11,
@@ -828,8 +898,10 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
           backdropFilter: 'blur(8px)',
           transition: 'color 0.2s',
         }}
+        onMouseEnter={e => ((e.target as HTMLElement).style.color = 'rgba(255,255,255,0.55)')}
+        onMouseLeave={e => ((e.target as HTMLElement).style.color = 'rgba(255,255,255,0.2)')}
       >
-        ← Exit
+        ← Tournaments
       </Link>
 
       {/* Champion overlay banner */}
@@ -948,6 +1020,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
                 visible={isVisible(match)}
                 initialAnim={showReveal || match.roundNumber > 1}
                 onSelectWinner={handleSelectWinner}
+                onResetWinner={handleResetWinner}
               />
             ))}
 
