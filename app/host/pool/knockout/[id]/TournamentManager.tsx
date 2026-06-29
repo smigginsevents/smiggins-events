@@ -78,29 +78,30 @@ interface Props {
   allPlayers: Player[]
 }
 
-// ─── Pool ball decoration ─────────────────────────────────────────────────────
-function PoolBall({ type }: { type: '8' | '5' | '1' }) {
-  const config = {
-    '8': { bg: '#1a1a1a', stripe: false, num: '8', light: '#555', dark: '#000' },
-    '5': { bg: '#E8820A', stripe: false, num: '5', light: '#FFB347', dark: '#7A3800' },
-    '1': { bg: '#E8CC00', stripe: false, num: '1', light: '#FFF08A', dark: '#967E00' },
-  }[type]
-  const sz = 44
+// ─── Pool ball (matches leaderboard StaticBall, scaled for TV) ───────────────
+function PoolBall({ hue, size = 72 }: { hue: 'orange' | 'yellow'; size?: number }) {
+  const base  = hue === 'orange' ? '#E8820A' : '#E8CC00'
+  const light = hue === 'orange' ? '#FFCA6A' : '#FFF08A'
+  const dark  = hue === 'orange' ? '#7A3800' : '#967E00'
+  const num   = hue === 'orange' ? '5' : '1'
   return (
     <div style={{
-      width: sz, height: sz, borderRadius: '50%', flexShrink: 0,
-      background: `radial-gradient(circle at 32% 28%, ${config.light} 0%, ${config.bg} 52%, ${config.dark} 100%)`,
-      boxShadow: `inset -3px -4px 10px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.15), 0 6px 20px rgba(0,0,0,0.5)`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, position: 'relative',
+      background: `radial-gradient(circle at 33% 28%, ${light} 0%, ${base} 52%, ${dark} 100%)`,
+      boxShadow: `inset -4px -5px 14px rgba(0,0,0,0.45), inset 3px 3px 8px rgba(255,255,255,0.22), 0 8px 28px rgba(0,0,0,0.55)`,
     }}>
       <div style={{
-        width: sz * 0.48, height: sz * 0.48, borderRadius: '50%',
-        background: 'rgba(255,255,255,0.92)',
+        position: 'absolute', inset: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <span style={{ fontFamily: 'var(--font-jost)', fontWeight: 900, fontSize: sz * 0.24, color: '#111', lineHeight: 1 }}>
-          {config.num}
-        </span>
+        <div style={{
+          width: size * 0.48, height: size * 0.48, borderRadius: '50%', background: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontFamily: 'var(--font-jost)', fontWeight: 900, fontSize: size * 0.26, color: '#1a1a1a', lineHeight: 1 }}>
+            {num}
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -288,68 +289,79 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
         padding: '80px 56px',
         gap: 0,
       }}>
-        {/* Smiggins logo */}
+        {/* ── POOL COMP logo — identical layout to leaderboard, scaled for TV ── */}
         <motion.div
-          initial={{ opacity: 0, y: -16 }}
+          initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
+          transition={{ duration: 0.75, ease: 'easeOut' }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}
         >
+          {/* Smiggins logo */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/smigginslogo-white.png" alt="Smiggins"
-            style={{ height: 56, objectFit: 'contain', opacity: 0.88, marginBottom: 28 }}
+            style={{ height: 'clamp(52px, 6vw, 72px)', objectFit: 'contain', opacity: 0.9, marginBottom: 'clamp(14px, 2vw, 22px)' }}
           />
-        </motion.div>
 
-        {/* SMIGGINS POOL COMP */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 0.61, 0.36, 1] }}
-          style={{ textAlign: 'center' }}
-        >
-          <div style={{
-            fontWeight: 900, fontSize: 'clamp(3.2rem, 5.5vw, 5.2rem)',
-            lineHeight: 0.88, color: 'white',
-            letterSpacing: '-0.02em', textTransform: 'uppercase',
-            textShadow: '0 4px 40px rgba(0,0,0,0.55)',
-          }}>
-            SMIGGINS
-          </div>
-          <div style={{
-            fontWeight: 900, fontSize: 'clamp(3.8rem, 6.5vw, 6.2rem)',
-            lineHeight: 0.88, color: 'white',
-            letterSpacing: '-0.02em', textTransform: 'uppercase',
-            textShadow: '0 4px 40px rgba(0,0,0,0.55)',
-          }}>
-            POOL COMP
-          </div>
-        </motion.div>
+          {/* P [🟠5] [🟡1] L  →  "POOL" with balls as the OO */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 0.61, 0.36, 1] }}
+            style={{ display: 'flex', alignItems: 'center', gap: 'clamp(5px, 0.7vw, 10px)' }}
+          >
+            {/* P */}
+            <span style={{
+              fontFamily: 'var(--font-jost)', fontWeight: 900,
+              fontSize: 'clamp(3.8rem, 6.2vw, 6.4rem)',
+              color: 'white', lineHeight: 1, letterSpacing: '-0.02em',
+              textShadow: '0 4px 32px rgba(0,0,0,0.5)',
+            }}>P</span>
 
-        {/* Pool balls */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.35 }}
-          style={{ display: 'flex', gap: 14, margin: '28px 0 24px' }}
-        >
-          <PoolBall type="1" />
-          <PoolBall type="8" />
-          <PoolBall type="5" />
+            {/* 5-ball (orange) */}
+            <PoolBall hue="orange" size={72} />
+
+            {/* 1-ball (yellow) */}
+            <PoolBall hue="yellow" size={72} />
+
+            {/* L */}
+            <span style={{
+              fontFamily: 'var(--font-jost)', fontWeight: 900,
+              fontSize: 'clamp(3.8rem, 6.2vw, 6.4rem)',
+              color: 'white', lineHeight: 1, letterSpacing: '-0.02em',
+              textShadow: '0 4px 32px rgba(0,0,0,0.5)',
+            }}>L</span>
+          </motion.div>
+
+          {/* COMP */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.3 }}
+            style={{
+              fontFamily: 'var(--font-jost)', fontWeight: 900,
+              fontSize: 'clamp(2rem, 3.4vw, 3.6rem)',
+              color: 'white', letterSpacing: '0.28em',
+              lineHeight: 1, marginTop: 4,
+              textShadow: '0 3px 20px rgba(0,0,0,0.4)',
+            }}
+          >
+            COMP
+          </motion.div>
         </motion.div>
 
         {/* Hosted by */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
+          transition={{ duration: 0.85, delay: 0.48 }}
           style={{
             fontFamily: 'var(--font-great-vibes)',
-            fontSize: 'clamp(2rem, 3vw, 2.8rem)',
-            color: 'rgba(255,255,255,0.82)',
-            textShadow: '0 2px 16px rgba(0,0,0,0.4)',
+            fontSize: 'clamp(2.2rem, 3.2vw, 3.2rem)',
+            color: 'rgba(255,255,255,0.88)',
+            textShadow: '0 2px 20px rgba(0,0,0,0.35)',
             lineHeight: 1.2,
-            marginBottom: 10,
+            marginTop: 'clamp(18px, 2.5vw, 30px)',
           }}
         >
           Hosted by Freddy Holler
@@ -359,11 +371,11 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.65 }}
+          transition={{ duration: 0.6, delay: 0.62 }}
           style={{
-            fontSize: '0.8rem', fontWeight: 700,
-            color: 'rgba(255,255,255,0.32)',
-            letterSpacing: '0.3em', marginTop: 4,
+            fontSize: '0.78rem', fontWeight: 700,
+            color: 'rgba(255,255,255,0.3)',
+            letterSpacing: '0.3em', marginTop: 8,
           }}
         >
           {dayLabel} · 8:30PM
