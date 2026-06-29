@@ -490,36 +490,71 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
       if (selecting) return
       setSelecting(true)
 
-      const updated = matches.map(m =>
+      // Optimistic local update for instant UI response
+      const optimistic = matches.map(m =>
         m.id === match.id ? { ...m, winner: player, status: 'complete' } : m,
       )
-      setMatches(updated)
+      setMatches(optimistic)
 
       try {
         const supabase = createClient()
+
+        // 1. Persist winner to DB
         const { error } = await supabase
           .from('pool_matches')
           .update({ winner_id: player.id, status: 'complete' })
           .eq('id', match.id)
         if (error) throw new Error(error.message)
 
-        const roundMs = updated.filter(m => m.roundNumber === match.roundNumber)
-        const allDone = roundMs.every(m => m.status === 'complete' || m.isBye)
+        // 2. Refetch the full round from DB — eliminates local-state stale data
+        //    (bye match winner joins can silently return null from local state,
+        //    causing incorrect "tournament complete" when winners.length === 1)
+        const { data: freshRound, error: fe } = await supabase
+          .from('pool_matches')
+          .select(`
+            id, round_number, match_number, table_number, is_bye, status, winner_id,
+            player1:pool_players!pool_matches_player1_id_fkey(id, name),
+            player2:pool_players!pool_matches_player2_id_fkey(id, name),
+            winner:pool_players!pool_matches_winner_id_fkey(id, name)
+          `)
+          .eq('tournament_id', tournament.id)
+          .eq('round_number', match.roundNumber)
+        if (fe) throw new Error(fe.message)
 
-        if (allDone) {
-          const winners = roundMs
-            .sort((a, b) => a.matchNumber - b.matchNumber)
-            .map(m => m.winner!).filter(Boolean)
+        const roundMs = (freshRound ?? []).map(normalizeMatch)
 
-          if (winners.length === 1) {
-            await supabase.from('pool_tournaments').update({ status: 'complete' }).eq('id', tournament.id)
-          } else if (winners.length > 1) {
-            await spawnNextRound(supabase, match.roundNumber, updated, winners)
-          }
+        // Sync fresh round data back into local state
+        setMatches(prev => {
+          const byId = new Map(roundMs.map(m => [m.id, m]))
+          return prev.map(m => byId.get(m.id) ?? m)
+        })
+
+        // 3. Check if every match in the round is complete
+        const allDone = roundMs.every(m => m.status === 'complete')
+        if (!allDone) return
+
+        // 4. Collect winners — fallback to player1 for bye matches whose
+        //    winner join returns null (handles the "no final match" bug)
+        const winners = roundMs
+          .sort((a, b) => a.matchNumber - b.matchNumber)
+          .map(m => m.winner ?? (m.isBye ? m.player1 : null))
+          .filter((w): w is Player => w !== null)
+
+        if (winners.length === 0) return
+
+        if (winners.length === 1) {
+          // Grand final just finished — mark tournament complete
+          await supabase
+            .from('pool_tournaments')
+            .update({ status: 'complete' })
+            .eq('id', tournament.id)
+        } else {
+          // Multiple winners advance — spawn the next round
+          await spawnNextRound(supabase, match.roundNumber, optimistic, winners)
         }
       } catch (e: any) {
         alert('Error recording winner: ' + e.message)
-        setMatches(matches)
+        setMatches(matches) // Rollback on error
       } finally {
         setSelecting(false)
       }
@@ -536,20 +571,40 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
   ) {
     const maxMatch  = Math.max(...currentMatches.map(m => m.matchNumber))
     const nextRound = completedRound + 1
-    const rows = []
 
-    for (let i = 0; i < winners.length; i += 2) {
-      const isBye = i + 1 >= winners.length
+    // If odd number of winners, determine who gets the bye.
+    // Prefer a player who did NOT already have a bye in a previous round,
+    // so the same player doesn't get two byes. If everyone has had a bye,
+    // pick the last winner (standard practice).
+    let orderedWinners = [...winners]
+    if (orderedWinners.length % 2 !== 0) {
+      const prevByeIds = new Set(
+        currentMatches
+          .filter(m => m.isBye && m.winner)
+          .map(m => m.winner!.id)
+      )
+      // Find first winner who has NOT had a bye and move them to the end (bye slot)
+      const noPrevByeIdx = orderedWinners.findIndex(w => !prevByeIds.has(w.id))
+      if (noPrevByeIdx !== -1) {
+        const [byePlayer] = orderedWinners.splice(noPrevByeIdx, 1)
+        orderedWinners.push(byePlayer)
+      }
+      // else: everyone has had a bye — last player gets another (unavoidable)
+    }
+
+    const rows = []
+    for (let i = 0; i < orderedWinners.length; i += 2) {
+      const isBye = i + 1 >= orderedWinners.length
       rows.push({
         tournament_id: tournament.id,
         round_number:  nextRound,
         match_number:  maxMatch + Math.floor(i / 2) + 1,
         table_number:  (Math.floor(i / 2) % 2) + 1,
-        player1_id:    winners[i].id,
-        player2_id:    isBye ? null : winners[i + 1].id,
+        player1_id:    orderedWinners[i].id,
+        player2_id:    isBye ? null : orderedWinners[i + 1].id,
         is_bye:        isBye,
         status:        isBye ? 'complete' : 'pending',
-        winner_id:     isBye ? winners[i].id : null,
+        winner_id:     isBye ? orderedWinners[i].id : null,
       })
     }
 
@@ -563,13 +618,8 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
       `)
     if (error) throw new Error(error.message)
 
-    const newMatches: Match[] = (data ?? []).map((m: any) => ({
-      id: m.id, roundNumber: m.round_number, matchNumber: m.match_number,
-      tableNumber: m.table_number, isBye: m.is_bye, status: m.status,
-      player1: m.player1 ? { id: m.player1.id, name: m.player1.name } : null,
-      player2: m.player2 ? { id: m.player2.id, name: m.player2.name } : null,
-      winner:  m.winner  ? { id: m.winner.id,  name: m.winner.name  } : null,
-    }))
+    // Normalise using the shared helper — winner field correctly populated from DB join
+    const newMatches: Match[] = (data ?? []).map(normalizeMatch)
 
     setMatches(prev => [...prev, ...newMatches])
     setTimeout(() => setSvgKey(k => k + 1), 80)
@@ -687,14 +737,15 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
       setLateQueue(null)
       setTimeout(() => setSvgKey(k => k + 1), 80)
 
-      // Check if round is now complete (all matches done)
+      // Check if the round is now complete (all matches done)
       const allMatches = [...matches, newMatch]
       const roundMs = allMatches.filter(m => m.roundNumber === targetRound)
-      const allDone = roundMs.every(m => m.status === 'complete' || m.isBye)
+      const allDone = roundMs.every(m => m.status === 'complete')
       if (allDone) {
         const winners = roundMs
           .sort((a, b) => a.matchNumber - b.matchNumber)
-          .map(m => m.winner!).filter(Boolean)
+          .map(m => m.winner ?? (m.isBye ? m.player1 : null))
+          .filter((w): w is Player => w !== null)
         if (winners.length === 1) {
           await supabase.from('pool_tournaments').update({ status: 'complete' }).eq('id', tournament.id)
         } else if (winners.length > 1) {
