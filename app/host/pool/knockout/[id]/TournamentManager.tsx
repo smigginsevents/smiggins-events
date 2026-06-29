@@ -281,17 +281,17 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
     }}>
       <Background />
 
-      {/* ── LEFT PANEL — Branding ──────────────────────────────────────────── */}
+      {/* ── LEFT PANEL — Branding (dominant, wider half) ───────────────────── */}
       <div style={{
-        width: '44%', position: 'relative', zIndex: 10,
+        width: '57%', position: 'relative', zIndex: 10,
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        padding: '80px 56px',
+        padding: '60px 72px',
         gap: 0,
       }}>
-        {/* ── POOL COMP logo — identical layout to leaderboard, scaled for TV ── */}
+        {/* ── POOL COMP logo block — tight, cohesive, big ─────────────────── */}
         <motion.div
-          initial={{ opacity: 0, y: -14 }}
+          initial={{ opacity: 0, y: -18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75, ease: 'easeOut' }}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}
@@ -300,7 +300,7 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/smigginslogo-white.png" alt="Smiggins"
-            style={{ height: 'clamp(64px, 7.5vw, 92px)', objectFit: 'contain', opacity: 0.9, marginBottom: 'clamp(16px, 2.4vw, 28px)' }}
+            style={{ height: 'clamp(72px, 8vw, 104px)', objectFit: 'contain', opacity: 0.9, marginBottom: 'clamp(18px, 2.6vw, 32px)' }}
           />
 
           {/* P [🟠5] [🟡1] L  →  "POOL" with balls as the OO */}
@@ -308,60 +308,60 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 0.61, 0.36, 1] }}
-            style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 0.9vw, 12px)' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 0.8vw, 11px)' }}
           >
             {/* P */}
             <span style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(5rem, 8.5vw, 9.2rem)',
+              fontSize: 'clamp(6rem, 10vw, 11.5rem)',
               color: 'white', lineHeight: 1, letterSpacing: '-0.02em',
-              textShadow: '0 4px 40px rgba(0,0,0,0.55)',
+              textShadow: '0 6px 48px rgba(0,0,0,0.6)',
             }}>P</span>
 
             {/* 5-ball (orange) */}
-            <PoolBall hue="orange" size={96} />
+            <PoolBall hue="orange" size={116} />
 
             {/* 1-ball (yellow) */}
-            <PoolBall hue="yellow" size={96} />
+            <PoolBall hue="yellow" size={116} />
 
             {/* L */}
             <span style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(5rem, 8.5vw, 9.2rem)',
+              fontSize: 'clamp(6rem, 10vw, 11.5rem)',
               color: 'white', lineHeight: 1, letterSpacing: '-0.02em',
-              textShadow: '0 4px 40px rgba(0,0,0,0.55)',
+              textShadow: '0 6px 48px rgba(0,0,0,0.6)',
             }}>L</span>
           </motion.div>
 
-          {/* COMP */}
+          {/* COMP — tight against POOL row */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.3 }}
             style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(2.8rem, 4.8vw, 5.2rem)',
-              color: 'white', letterSpacing: '0.3em',
-              lineHeight: 1, marginTop: 6,
-              textShadow: '0 3px 24px rgba(0,0,0,0.45)',
+              fontSize: 'clamp(3.2rem, 5.6vw, 6.4rem)',
+              color: 'white', letterSpacing: '0.32em',
+              lineHeight: 1, marginTop: 0,
+              textShadow: '0 4px 28px rgba(0,0,0,0.5)',
             }}
           >
             COMP
           </motion.div>
         </motion.div>
 
-        {/* Hosted by — cursive via --font-dancing (Great Vibes) */}
+        {/* ── Hosted by — separated generously from the logo block ─────────── */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.85, delay: 0.48 }}
           style={{
             fontFamily: 'var(--font-dancing)',
-            fontSize: 'clamp(1.8rem, 2.6vw, 2.6rem)',
+            fontSize: 'clamp(1.8rem, 2.6vw, 2.8rem)',
             color: 'rgba(255,255,255,0.88)',
             textShadow: '0 2px 20px rgba(0,0,0,0.35)',
             lineHeight: 1.2,
-            marginTop: 'clamp(20px, 2.8vw, 34px)',
+            marginTop: 'clamp(40px, 5.5vw, 68px)',
           }}
         >
           Hosted by Freddy Holler
@@ -375,8 +375,8 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
           style={{
             fontFamily: 'var(--font-jost)',
             fontSize: '1rem', fontWeight: 600,
-            color: 'rgba(255,255,255,0.35)',
-            letterSpacing: '0.32em', marginTop: 10,
+            color: 'rgba(255,255,255,0.32)',
+            letterSpacing: '0.32em', marginTop: 12,
           }}
         >
           {dayLabel} · 8:30PM
@@ -397,11 +397,11 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
         position: 'relative', zIndex: 10, flexShrink: 0,
       }} />
 
-      {/* ── RIGHT PANEL — Player registration ─────────────────────────────── */}
+      {/* ── RIGHT PANEL — Player registration (narrower) ───────────────────── */}
       <div style={{
         flex: 1, position: 'relative', zIndex: 10,
         display: 'flex', flexDirection: 'column',
-        padding: '68px 56px 56px',
+        padding: '68px 44px 56px',
         gap: 0,
         minWidth: 0,
       }}>
