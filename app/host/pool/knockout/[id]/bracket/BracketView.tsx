@@ -28,12 +28,12 @@ const ROUND_W   = CARD_W + COL_GAP  // 272px per round column
 
 // Double-sided layout uses smaller cards to keep wide brackets readable on screen
 const CARD_H_D    = 42
-const CARD_W_D    = 150
+const CARD_W_D    = 148
 const VS_GAP_D    = 14
-const MATCH_GAP_D = 30
-const SLOT_H_D    = CARD_H_D * 2 + VS_GAP_D + MATCH_GAP_D  // 128px
-const COL_GAP_D   = 56
-const ROUND_W_D   = CARD_W_D + COL_GAP_D  // 206px
+const MATCH_GAP_D = 36
+const SLOT_H_D    = CARD_H_D * 2 + VS_GAP_D + MATCH_GAP_D  // 134px
+const COL_GAP_D   = 72
+const ROUND_W_D   = CARD_W_D + COL_GAP_D  // 220px
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Player { id: string; name: string }
@@ -104,18 +104,29 @@ function buildLayout(matches: Match[]) {
   }
 
   // ── Double-sided (for 16+ players) ─────────────────────────────────────
-  // Left side: first ceil(N/2) matches in each round, growing right toward center.
-  // Right side: remaining matches, mirrored — growing left toward center.
-  // Final: single match centered between the two sides.
+  // Left side:   first ceil(N/2) matches per round, growing rightward toward center.
+  // Right side:  remaining matches, mirrored — growing leftward toward center.
+  // Grand final: single match centered between the two sides.
+  //
+  // Winners from spawnNextRound are sorted by matchNumber of their source match.
+  // Left R1 matches always get lower matchNumbers than right R1 matches (generated
+  // in one batch), so the first-half split by sorted index is stable across all
+  // subsequent rounds — left R1 winners pair with each other, creating left R2
+  // matches with the lowest matchNumbers in that round, and so on.
 
-  // Use stable expectedMaxRound based on r1Count so geometry never shifts as new rounds are added to DB.
+  // Use stable expectedMaxRound derived from r1Count only — geometry never shifts
+  // as new rounds are added to the DB mid-tournament.
   const expectedMaxRound = Math.max(Math.ceil(Math.log2(r1Count)) + 1, 2)
   const sideRounds = expectedMaxRound - 1   // rounds per side before grand final
 
-  // Double-sided uses smaller card dimensions to keep wide brackets on screen
+  // Shorthand aliases for the double-sided constants
   const CW = CARD_W_D, CH = CARD_H_D, VG = VS_GAP_D, SH = SLOT_H_D, CG = COL_GAP_D, RW = ROUND_W_D
 
-  // X geometry — stable throughout tournament
+  // ── X geometry (stable, derived from sideRounds only) ──────────────────
+  //   Left  side round r: xLeft  = (r-1) * RW                              [grows rightward]
+  //   Final:              finalX = (sideRounds-1) * RW + CW + CG
+  //   Right side round r: xRight = finalX + CW + CG + (sideRounds-r) * RW  [grows leftward]
+  //   Total width       : 2*(sideRounds-1)*RW + 3*CW + 2*CG
   const finalX = Math.max(sideRounds - 1, 0) * RW + CW + CG
   const totalW = 2 * Math.max(sideRounds - 1, 0) * RW + 3 * CW + 2 * CG
 
@@ -123,33 +134,35 @@ function buildLayout(matches: Match[]) {
     const rMatches = [...(byRound[round] ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
 
     if (rMatches.length === 1 && round > 1) {
-      // Grand final — centre; centerY set after totalH is known
+      // Grand final — centred; centerY is set after totalH is known below
       layout.push({ ...rMatches[0], indexInRound: 0, centerY: 0, x: finalX, side: 'center', cardW: CW, cardH: CH, vsGap: VG, colGap: CG })
       continue
     }
 
+    // Split sorted matches: first half → left, rest → right
     const halfCount     = Math.ceil(rMatches.length / 2)
-    const slotsPerMatch = Math.pow(2, round - 1)
+    const slotsPerMatch = Math.pow(2, round - 1)   // 1 for R1, 2 for R2, 4 for R3 …
 
     rMatches.forEach((m, i) => {
       const isLeft     = i < halfCount
       const localIndex = isLeft ? i : i - halfCount
-      const centerY    = (localIndex + 0.5) * slotsPerMatch * SH
-      // Left side: round 1 at far left (x=0), grows rightward toward center.
-      // Right side: round 1 at far right, grows leftward toward center.
-      const xRight = finalX + CW + CG + Math.max(sideRounds - round, 0) * RW
-      const x      = isLeft ? (round - 1) * RW : xRight
+      // Y: each slot is slotsPerMatch * SH tall; match centerY is in the middle of its slot
+      const centerY = (localIndex + 0.5) * slotsPerMatch * SH
+      // X: left grows right, right grows left
+      const x = isLeft
+        ? (round - 1) * RW
+        : finalX + CW + CG + Math.max(sideRounds - round, 0) * RW
 
       layout.push({ ...m, indexInRound: i, centerY, x, side: isLeft ? 'left' : 'right', cardW: CW, cardH: CH, vsGap: VG, colGap: CG })
     })
   }
 
-  // totalH from non-final matches
+  // totalH is determined by the tallest non-final match column
   const sideMatches = layout.filter(m => m.side !== 'center')
   const maxCY  = sideMatches.length > 0 ? Math.max(...sideMatches.map(m => m.centerY)) : SH
   const totalH = maxCY + CH + VG / 2 + MATCH_GAP_D
 
-  // Centre the grand final vertically
+  // Place the grand final vertically centred
   const finalM = layout.find(m => m.side === 'center')
   if (finalM) finalM.centerY = totalH / 2
 
@@ -208,53 +221,70 @@ function buildLinesDouble(layout: LayoutMatch[]): Line[] {
     byRound[m.roundNumber].push(m)
   }
   const rounds = Object.keys(byRound).map(Number).sort((a, b) => a - b)
-  const maxRound = rounds[rounds.length - 1]
 
   for (let ri = 0; ri < rounds.length - 1; ri++) {
     const cur  = rounds[ri]
     const next = rounds[ri + 1]
-    const curMs  = [...(byRound[cur]  ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
-    const nextMs = [...(byRound[next] ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
+    // Sort within each round by matchNumber — this is the canonical visual order and
+    // mirrors how spawnNextRound pairs winners (ascending matchNumber).
+    const allCur  = [...(byRound[cur]  ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
+    const allNext = [...(byRound[next] ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
     const delay = 0.15 + ri * 0.35
 
-    // Check if next round is the grand final (contains a center match)
-    const finalM = nextMs.find(m => m.side === 'center')
+    // ── Step 7: SF → Grand Final ──────────────────────────────────────────
+    // When the next round contains the center (grand final) match, draw straight
+    // horizontal connectors from each semi-final to the final card.
+    const finalM = allNext.find(m => m.side === 'center')
     if (finalM) {
-      // Connect SF winners on each side to the grand final
-      const leftSF  = curMs.filter(m => m.side === 'left')
-      const rightSF = curMs.filter(m => m.side === 'right')
-      if (leftSF[0])  lines.push({ key: 'left-to-final',  d: `M ${leftSF[0].x + leftSF[0].cardW} ${leftSF[0].centerY} H ${finalM.x}`, delay })
-      if (rightSF[0]) lines.push({ key: 'right-to-final', d: `M ${rightSF[0].x} ${rightSF[0].centerY} H ${finalM.x + finalM.cardW}`, delay })
+      const leftSF  = allCur.find(m => m.side === 'left')
+      const rightSF = allCur.find(m => m.side === 'right')
+      if (leftSF)  lines.push({ key: 'left-sf-to-final',  d: `M ${leftSF.x + leftSF.cardW} ${leftSF.centerY} H ${finalM.x}`, delay })
+      if (rightSF) lines.push({ key: 'right-sf-to-final', d: `M ${rightSF.x} ${rightSF.centerY} H ${finalM.x + finalM.cardW}`, delay })
       continue
     }
 
-    // Left-side connections (lines grow rightward)
-    const leftCur  = curMs.filter(m => m.side === 'left')
-    const leftNext = nextMs.filter(m => m.side === 'left')
+    // ── Step 5: Left-side connections (lines grow rightward) ──────────────
+    // leftCur[ni*2] and leftCur[ni*2+1] are the two children that feed leftNext[ni].
+    // This pairing is guaranteed by spawnNextRound: winners sorted by matchNumber
+    // are paired sequentially, and left-side source matches always have lower
+    // matchNumbers than right-side source matches.
+    const leftCur  = allCur.filter(m => m.side === 'left')
+    const leftNext = allNext.filter(m => m.side === 'left')
     for (let ni = 0; ni < leftNext.length; ni++) {
-      const m1 = leftCur[ni * 2]; const m2 = leftCur[ni * 2 + 1]; const parent = leftNext[ni]
+      const m1     = leftCur[ni * 2]
+      const m2     = leftCur[ni * 2 + 1]   // undefined when one child has a bye
+      const parent = leftNext[ni]
       if (!parent || !m1) continue
-      const rX = m1.x + m1.cardW; const midX = rX + m1.colGap / 2
+      const rightX = m1.x + m1.cardW
+      const midX   = rightX + m1.colGap / 2
       if (m2) {
-        lines.push({ key: `L-elbow-${cur}-${ni}`,   d: `M ${rX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${rX}`, delay })
+        // Elbow: from right edge of m1, across to midX, down to m2, back to right edge
+        lines.push({ key: `L-elbow-${cur}-${ni}`,    d: `M ${rightX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${rightX}`, delay })
+        // Connect: from elbow midpoint horizontally to parent's left edge
         lines.push({ key: `L-connect-${next}-${ni}`, d: `M ${midX} ${parent.centerY} H ${parent.x}`, delay: delay + 0.18 })
       } else {
-        lines.push({ key: `L-single-${cur}-${ni}`, d: `M ${rX} ${m1.centerY} H ${parent.x}`, delay })
+        // Single child (bye round) — straight line to parent
+        lines.push({ key: `L-single-${cur}-${ni}`, d: `M ${rightX} ${m1.centerY} H ${parent.x}`, delay })
       }
     }
 
-    // Right-side connections (lines grow leftward — mirrored)
-    const rightCur  = curMs.filter(m => m.side === 'right')
-    const rightNext = nextMs.filter(m => m.side === 'right')
+    // ── Step 6: Right-side connections (lines grow leftward — mirrored) ───
+    const rightCur  = allCur.filter(m => m.side === 'right')
+    const rightNext = allNext.filter(m => m.side === 'right')
     for (let ni = 0; ni < rightNext.length; ni++) {
-      const m1 = rightCur[ni * 2]; const m2 = rightCur[ni * 2 + 1]; const parent = rightNext[ni]
+      const m1     = rightCur[ni * 2]
+      const m2     = rightCur[ni * 2 + 1]
+      const parent = rightNext[ni]
       if (!parent || !m1) continue
-      const lX = m1.x; const midX = lX - m1.colGap / 2
+      const leftX = m1.x               // left edge of the right-side card
+      const midX  = leftX - m1.colGap / 2
       if (m2) {
-        lines.push({ key: `R-elbow-${cur}-${ni}`,   d: `M ${lX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${lX}`, delay })
+        // Elbow: from left edge of m1, across to midX, down to m2, back to left edge
+        lines.push({ key: `R-elbow-${cur}-${ni}`,    d: `M ${leftX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${leftX}`, delay })
+        // Connect: from elbow midpoint horizontally to parent's right edge (inward)
         lines.push({ key: `R-connect-${next}-${ni}`, d: `M ${midX} ${parent.centerY} H ${parent.x + parent.cardW}`, delay: delay + 0.18 })
       } else {
-        lines.push({ key: `R-single-${cur}-${ni}`, d: `M ${lX} ${m1.centerY} H ${parent.x + parent.cardW}`, delay })
+        lines.push({ key: `R-single-${cur}-${ni}`, d: `M ${leftX} ${m1.centerY} H ${parent.x + parent.cardW}`, delay })
       }
     }
   }
@@ -519,7 +549,39 @@ function BracketMatchCard({
         </motion.div>
       )}
 
-      {!match.isBye && (
+      {match.isBye ? (
+        /* BYE slot — visually muted placeholder in the bottom card position */
+        visible && (
+          <motion.div
+            initial={initialAnim ? { opacity: 0 } : false}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+            style={{
+              position: 'absolute',
+              left: match.x,
+              top: p2Top,
+              width: match.cardW,
+              height: match.cardH,
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.05)',
+              background: 'rgba(4,10,30,0.28)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 16px',
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--font-jost)',
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.15)',
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+            }}>
+              BYE
+            </span>
+          </motion.div>
+        )
+      ) : (
         <PlayerCard
           player={match.player2}
           isWinner={p2Win}

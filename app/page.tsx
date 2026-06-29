@@ -333,7 +333,7 @@ export default function HomePage() {
         <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.3 }}
           className="text-white/70 mt-1 mb-8"
           style={{ fontFamily: 'var(--font-dancing)', fontSize: 'clamp(1.3rem, 3.5vw, 1.9rem)' }}
-        >Hosted by Freddy Holler</motion.p>
+        >Hosted by Freddy Flyfingaz</motion.p>
       </div>
 
       {/* Cards */}
