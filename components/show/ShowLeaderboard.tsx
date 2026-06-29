@@ -44,7 +44,7 @@ export function ShowLeaderboard({ entries, heading = 'Leaderboard' }: Props) {
                 </span>
                 <div className="flex-1">
                   <div className="flex items-baseline justify-between mb-1.5">
-                    <span className="text-white text-lg font-semibold">{entry.team_name}</span>
+                    <span className="text-white text-lg font-semibold uppercase">{entry.team_name}</span>
                     <span className={`text-sm font-bold ${style.text}`}>{entry.total_points} pts</span>
                   </div>
                   <div className="h-3 rounded-full bg-white/10 overflow-hidden">

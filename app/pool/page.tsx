@@ -192,6 +192,7 @@ export default async function PoolLeaderboardPage() {
                     fontSize: '0.95rem',
                     fontWeight: isTop3 ? 700 : 500,
                     color: 'white',
+                    textTransform: 'uppercase',
                   }}>
                     {row.name}
                     {row.compWins > 0 && (

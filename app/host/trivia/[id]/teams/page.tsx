@@ -118,7 +118,7 @@ export default function TriviaTeamsPage() {
           <ul className="divide-y divide-timber/10">
             {eventTeams.map((team) => (
               <li key={team.id} className="px-6 py-3 flex items-center justify-between">
-                <span className="font-medium text-navy">{team.name}</span>
+                <span className="font-medium text-navy uppercase">{team.name}</span>
                 <button
                   onClick={() => removeTeam(team.id)}
                   className="text-navy/30 hover:text-red-500 transition-colors text-sm"
@@ -148,7 +148,7 @@ export default function TriviaTeamsPage() {
                 <li key={t.id}>
                   <button
                     onClick={() => addTeam(t)}
-                    className="w-full text-left px-4 py-3 text-sm text-navy hover:bg-snow transition-colors"
+                    className="w-full text-left px-4 py-3 text-sm text-navy hover:bg-snow transition-colors uppercase"
                   >
                     {t.name}
                   </button>

@@ -162,7 +162,8 @@ function PlayerRow({ entry, index, onRemove }: { entry: Entry; index: number; on
         fontFamily: 'var(--font-jost)', fontWeight: 600,
         fontSize: '1.2rem', lineHeight: 1.2,
         color: 'rgba(255,255,255,0.92)',
-        letterSpacing: '0.01em',
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
         textShadow: '0 1px 8px rgba(0,0,0,0.4)',
       }}>
         {entry.name}
@@ -558,6 +559,7 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
                           padding: '12px 20px',
                           fontFamily: 'var(--font-jost)', fontSize: '1rem',
                           color: 'rgba(255,255,255,0.8)',
+                          textTransform: 'uppercase',
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           borderBottom: '1px solid rgba(255,255,255,0.06)',
                           transition: 'background 0.1s',

@@ -47,7 +47,7 @@ export function LeaderboardBars({ entries, animate = true }: LeaderboardBarsProp
               {/* Bar + label */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-navy truncate">{entry.team_name}</span>
+                  <span className="text-sm font-medium text-navy truncate uppercase">{entry.team_name}</span>
                   <span className="text-xs text-navy/50 shrink-0">{entry.total_points} pts</span>
                 </div>
                 <div className="h-2 rounded-full bg-navy/8 overflow-hidden">

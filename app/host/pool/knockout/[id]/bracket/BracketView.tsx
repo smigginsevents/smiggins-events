@@ -292,13 +292,14 @@ function PlayerCard({
         style={{
           fontFamily: 'var(--font-jost)',
           fontSize: 14,
-          fontWeight: isWinner ? 700 : hasPlayer ? 500 : 400,
+          fontWeight: isWinner ? 700 : hasPlayer ? 600 : 400,
           color: isLoser
             ? 'rgba(255,255,255,0.18)'
             : hasPlayer
             ? 'rgba(255,255,255,0.92)'
             : 'rgba(255,255,255,0.2)',
-          letterSpacing: hasPlayer ? '0.01em' : '0.08em',
+          letterSpacing: hasPlayer ? '0.06em' : '0.08em',
+          textTransform: 'uppercase',
           textDecoration: isLoser ? 'line-through' : 'none',
           textDecorationColor: 'rgba(255,255,255,0.15)',
           whiteSpace: 'nowrap',
@@ -800,8 +801,8 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
               boxShadow: '0 4px 24px rgba(232,204,0,0.35)',
               whiteSpace: 'nowrap',
             }}
-          >
-            🏆 &nbsp;{champion.name} &nbsp;— CHAMPION
+            >
+              🏆 &nbsp;{champion.name.toUpperCase()} &nbsp;— CHAMPION
           </motion.div>
         )}
       </AnimatePresence>
@@ -929,11 +930,12 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
                     padding: '0 16px',
                   }}>
                     <span style={{
-                      fontFamily: 'var(--font-jost)', fontSize: 15, fontWeight: 900,
-                      color: 'white', letterSpacing: '0.02em',
+                    fontFamily: 'var(--font-jost)', fontSize: 15, fontWeight: 900,
+                      color: 'white', letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
                       textShadow: '0 1px 6px rgba(0,0,0,0.3)',
-                    }}>
-                      {champion.name}
+                  }}>
+                    {champion.name}
                     </span>
                   </div>
                 </motion.div>
@@ -1079,7 +1081,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
                     <div style={{ fontSize: '0.65rem', color: 'rgba(232,130,10,0.7)', letterSpacing: '0.15em', marginBottom: 2 }}>
                       WAITING FOR PARTNER
                     </div>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)' }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       {lateQueue.name}
                     </div>
                   </div>
@@ -1174,6 +1176,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
                             cursor: 'pointer', padding: '10px 14px',
                             fontFamily: 'var(--font-jost)', fontSize: '0.9rem',
                             color: 'rgba(255,255,255,0.78)',
+                            textTransform: 'uppercase',
                             display: 'flex', justifyContent: 'space-between',
                             transition: 'background 0.1s',
                           }}
