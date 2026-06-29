@@ -1175,32 +1175,6 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
         ← Tournaments
       </Link>
 
-      {/* Champion overlay banner */}
-      <AnimatePresence>
-        {champion && (
-          <motion.div
-            key="champ-banner"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 240, damping: 22 }}
-            style={{
-              position: 'fixed', top: 18, left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 40,
-              background: 'linear-gradient(135deg, #E8CC00, #E8820A)',
-              borderRadius: 24,
-              padding: '7px 22px',
-              fontFamily: 'var(--font-jost)', fontWeight: 900,
-              color: 'white', fontSize: 14, letterSpacing: '0.04em',
-              boxShadow: '0 4px 24px rgba(232,204,0,0.35)',
-              whiteSpace: 'nowrap',
-            }}
-            >
-              🏆 &nbsp;{champion.name.toUpperCase()} &nbsp;— CHAMPION
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ── Bracket container — centred, auto-scaled ───────────────────────── */}
       <div
         ref={containerRef}
