@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -44,6 +44,7 @@ interface LayoutMatch extends Match {
   indexInRound: number
   centerY: number
   x: number
+  side: 'left' | 'right' | 'center' // 'center' only in double-sided final
 }
 
 interface Props {
@@ -53,6 +54,9 @@ interface Props {
 }
 
 // ─── Layout calculation ───────────────────────────────────────────────────────
+// Double-sided bracket is used when r1Count >= 8 (16+ players).
+// Single-sided is used otherwise.
+
 function buildLayout(matches: Match[]) {
   const byRound: Record<number, Match[]> = {}
   for (const m of matches) {
@@ -62,48 +66,89 @@ function buildLayout(matches: Match[]) {
 
   const rounds = Object.keys(byRound).map(Number).sort((a, b) => a - b)
   if (rounds.length === 0) {
-    return { layout: [] as LayoutMatch[], rounds: [], r1Count: 0, totalH: 0, totalW: 0 }
+    return { layout: [] as LayoutMatch[], rounds: [], r1Count: 0, totalH: 0, totalW: 0, isDouble: false }
   }
 
-  const r1Count = (byRound[rounds[0]] ?? []).length
+  const r1Count  = (byRound[rounds[0]] ?? []).length
+  const maxRound = rounds[rounds.length - 1]
+  const isDouble = r1Count >= 8
 
   const layout: LayoutMatch[] = []
+
+  if (!isDouble) {
+    // ── Single-sided (standard left-to-right) ─────────────────────────────
+    for (const round of rounds) {
+      const rMatches = [...(byRound[round] ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
+      const slotsPerMatch = Math.pow(2, round - 1)
+      rMatches.forEach((m, i) => {
+        layout.push({ ...m, indexInRound: i, centerY: (i + 0.5) * slotsPerMatch * SLOT_H, x: (round - 1) * ROUND_W, side: 'left' })
+      })
+    }
+    const maxCY = layout.length > 0 ? Math.max(...layout.map(m => m.centerY)) : SLOT_H
+    const totalH = maxCY + CARD_H + VS_GAP / 2 + MATCH_GAP
+    const totalW = maxRound * ROUND_W + CARD_W
+    return { layout, rounds, r1Count, totalH, totalW, isDouble }
+  }
+
+  // ── Double-sided (for 16+ players) ─────────────────────────────────────
+  // Left side: first ceil(N/2) matches in each round, growing right toward center.
+  // Right side: remaining matches, mirrored — growing left toward center.
+  // Final: single match centered between the two sides.
+  const sideRounds = maxRound - 1   // rounds before the grand final on each side
+  // X geometry:
+  const finalX = Math.max(sideRounds - 1, 0) * ROUND_W + CARD_W + COL_GAP
+  const totalW = 2 * Math.max(sideRounds - 1, 0) * ROUND_W + 3 * CARD_W + 2 * COL_GAP
+
   for (const round of rounds) {
     const rMatches = [...(byRound[round] ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
+
+    if (round === maxRound && rMatches.length === 1) {
+      // Grand final — centre; centerY set after totalH is known
+      layout.push({ ...rMatches[0], indexInRound: 0, centerY: 0, x: finalX, side: 'center' })
+      continue
+    }
+
+    const halfCount     = Math.ceil(rMatches.length / 2)
     const slotsPerMatch = Math.pow(2, round - 1)
 
     rMatches.forEach((m, i) => {
-      layout.push({
-        ...m,
-        indexInRound: i,
-        centerY: (i + 0.5) * slotsPerMatch * SLOT_H,
-        x: (round - 1) * ROUND_W,
-      })
+      const isLeft     = i < halfCount
+      const localIndex = isLeft ? i : i - halfCount
+      const centerY    = (localIndex + 0.5) * slotsPerMatch * SLOT_H
+      // Right side x: mirror of left, adjacent to final
+      const xRight = finalX + CARD_W + COL_GAP + Math.max(sideRounds - round, 0) * ROUND_W
+      const x      = isLeft ? (round - 1) * ROUND_W : xRight
+
+      layout.push({ ...m, indexInRound: i, centerY, x, side: isLeft ? 'left' : 'right' })
     })
   }
 
-  // Compute totalH from actual match positions — late arrivals in later rounds
-  // can place matches below the round-1-derived height, so we measure reality.
-  const maxCenterY = layout.length > 0 ? Math.max(...layout.map(m => m.centerY)) : SLOT_H
-  const totalH = maxCenterY + CARD_H + VS_GAP / 2 + MATCH_GAP
+  // totalH from non-final matches
+  const sideMatches = layout.filter(m => m.side !== 'center')
+  const maxCY  = sideMatches.length > 0 ? Math.max(...sideMatches.map(m => m.centerY)) : SLOT_H
+  const totalH = maxCY + CARD_H + VS_GAP / 2 + MATCH_GAP
 
-  const maxRound = rounds[rounds.length - 1]
-  const totalW   = maxRound * ROUND_W + CARD_W
+  // Centre the grand final vertically
+  const finalM = layout.find(m => m.side === 'center')
+  if (finalM) finalM.centerY = totalH / 2
 
-  return { layout, rounds, r1Count, totalH, totalW }
+  return { layout, rounds, r1Count, totalH, totalW, isDouble }
 }
 
 // ─── SVG line generation ──────────────────────────────────────────────────────
 interface Line { key: string; d: string; delay: number }
 
-function buildLines(layout: LayoutMatch[]): Line[] {
+function buildLines(layout: LayoutMatch[], isDouble: boolean): Line[] {
+  return isDouble ? buildLinesDouble(layout) : buildLinesSingle(layout)
+}
+
+function buildLinesSingle(layout: LayoutMatch[]): Line[] {
   const lines: Line[] = []
   const byRound: Record<number, LayoutMatch[]> = {}
   for (const m of layout) {
     if (!byRound[m.roundNumber]) byRound[m.roundNumber] = []
     byRound[m.roundNumber].push(m)
   }
-
   const rounds = Object.keys(byRound).map(Number).sort((a, b) => a - b)
 
   for (let ri = 0; ri < rounds.length - 1; ri++) {
@@ -111,38 +156,87 @@ function buildLines(layout: LayoutMatch[]): Line[] {
     const next   = rounds[ri + 1]
     const curMs  = [...(byRound[cur]  ?? [])].sort((a, b) => a.indexInRound - b.indexInRound)
     const nextMs = [...(byRound[next] ?? [])].sort((a, b) => a.indexInRound - b.indexInRound)
+    const delay  = 0.15 + ri * 0.35
 
     for (let ni = 0; ni < nextMs.length; ni++) {
-      const m1     = curMs[ni * 2]
-      const m2     = curMs[ni * 2 + 1]
-      const parent = nextMs[ni]
+      const m1 = curMs[ni * 2]; const m2 = curMs[ni * 2 + 1]; const parent = nextMs[ni]
       if (!parent || !m1) continue
-
-      const rightX = m1.x + CARD_W
-      const midX   = rightX + COL_GAP / 2
-      const delay  = 0.15 + ri * 0.35
-
+      const rightX = m1.x + CARD_W; const midX = rightX + COL_GAP / 2
       if (m2) {
-        lines.push({ key: `elbow-${cur}-${ni}`, d: `M ${rightX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${rightX}`, delay })
+        lines.push({ key: `elbow-${cur}-${ni}`,   d: `M ${rightX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${rightX}`, delay })
         lines.push({ key: `connect-${next}-${ni}`, d: `M ${midX} ${parent.centerY} H ${parent.x}`, delay: delay + 0.18 })
       } else {
         lines.push({ key: `single-${cur}-${ni}`, d: `M ${rightX} ${m1.centerY} H ${parent.x}`, delay })
       }
     }
   }
+  // Champion stub line
+  const lastRound = rounds[rounds.length - 1]
+  const finalM = (byRound[lastRound] ?? []).find(m => m.indexInRound === 0)
+  if (finalM) {
+    lines.push({ key: 'champ-line', d: `M ${finalM.x + CARD_W} ${finalM.centerY} H ${finalM.x + CARD_W + COL_GAP}`, delay: 0.15 + (rounds.length - 1) * 0.35 + 0.18 })
+  }
+  return lines
+}
 
-  if (rounds.length > 0) {
-    const lastRound  = rounds[rounds.length - 1]
-    const finalMatch = (byRound[lastRound] ?? []).find(m => m.indexInRound === 0)
-    if (finalMatch) {
-      lines.push({
-        key: 'champ-line',
-        d: `M ${finalMatch.x + CARD_W} ${finalMatch.centerY} H ${finalMatch.x + CARD_W + COL_GAP}`,
-        delay: 0.15 + (rounds.length - 1) * 0.35 + 0.18,
-      })
+function buildLinesDouble(layout: LayoutMatch[]): Line[] {
+  const lines: Line[] = []
+  const byRound: Record<number, LayoutMatch[]> = {}
+  for (const m of layout) {
+    if (!byRound[m.roundNumber]) byRound[m.roundNumber] = []
+    byRound[m.roundNumber].push(m)
+  }
+  const rounds = Object.keys(byRound).map(Number).sort((a, b) => a - b)
+  const maxRound = rounds[rounds.length - 1]
+
+  for (let ri = 0; ri < rounds.length - 1; ri++) {
+    const cur  = rounds[ri]
+    const next = rounds[ri + 1]
+    const curMs  = [...(byRound[cur]  ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
+    const nextMs = [...(byRound[next] ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
+    const delay = 0.15 + ri * 0.35
+
+    if (next === maxRound) {
+      // Connect SF winners on each side to the grand final
+      const leftSF  = curMs.filter(m => m.side === 'left')
+      const rightSF = curMs.filter(m => m.side === 'right')
+      const finalM  = nextMs.find(m => m.side === 'center')
+      if (!finalM) continue
+      if (leftSF[0])  lines.push({ key: 'left-to-final',  d: `M ${leftSF[0].x + CARD_W} ${leftSF[0].centerY} H ${finalM.x}`, delay })
+      if (rightSF[0]) lines.push({ key: 'right-to-final', d: `M ${rightSF[0].x} ${rightSF[0].centerY} H ${finalM.x + CARD_W}`, delay })
+      continue
+    }
+
+    // Left-side connections (lines grow rightward)
+    const leftCur  = curMs.filter(m => m.side === 'left')
+    const leftNext = nextMs.filter(m => m.side === 'left')
+    for (let ni = 0; ni < leftNext.length; ni++) {
+      const m1 = leftCur[ni * 2]; const m2 = leftCur[ni * 2 + 1]; const parent = leftNext[ni]
+      if (!parent || !m1) continue
+      const rX = m1.x + CARD_W; const midX = rX + COL_GAP / 2
+      if (m2) {
+        lines.push({ key: `L-elbow-${cur}-${ni}`,   d: `M ${rX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${rX}`, delay })
+        lines.push({ key: `L-connect-${next}-${ni}`, d: `M ${midX} ${parent.centerY} H ${parent.x}`, delay: delay + 0.18 })
+      } else {
+        lines.push({ key: `L-single-${cur}-${ni}`, d: `M ${rX} ${m1.centerY} H ${parent.x}`, delay })
+      }
+    }
+
+    // Right-side connections (lines grow leftward — mirrored)
+    const rightCur  = curMs.filter(m => m.side === 'right')
+    const rightNext = nextMs.filter(m => m.side === 'right')
+    for (let ni = 0; ni < rightNext.length; ni++) {
+      const m1 = rightCur[ni * 2]; const m2 = rightCur[ni * 2 + 1]; const parent = rightNext[ni]
+      if (!parent || !m1) continue
+      const lX = m1.x; const midX = lX - COL_GAP / 2
+      if (m2) {
+        lines.push({ key: `R-elbow-${cur}-${ni}`,   d: `M ${lX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${lX}`, delay })
+        lines.push({ key: `R-connect-${next}-${ni}`, d: `M ${midX} ${parent.centerY} H ${parent.x + CARD_W}`, delay: delay + 0.18 })
+      } else {
+        lines.push({ key: `R-single-${cur}-${ni}`, d: `M ${lX} ${m1.centerY} H ${parent.x + CARD_W}`, delay })
+      }
     }
   }
-
   return lines
 }
 
@@ -484,11 +578,11 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
   }, [showReveal, phase, revealedCount, matches])
 
   // ── Layout ─────────────────────────────────────────────────────────────────
-  const { layout, rounds, r1Count, totalH, totalW } = useMemo(
+  const { layout, rounds, r1Count, totalH, totalW, isDouble } = useMemo(
     () => buildLayout(matches), [matches],
   )
 
-  const lines       = useMemo(() => buildLines(layout), [layout])
+  const lines       = useMemo(() => buildLines(layout, isDouble), [layout, isDouble])
   const linesVisible = phase === 'lines' || phase === 'bracket'
 
   function isVisible(m: LayoutMatch) {
@@ -723,6 +817,42 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
         .insert({ tournament_id: tournament.id, player_id: player.id })
         .select()
 
+      // Find the active round (earliest round with pending games, or max round)
+      const activeRound = matches
+        .filter(m => m.status === 'pending' && !m.isBye)
+        .reduce<number>((min, m) => Math.min(min, m.roundNumber), Infinity)
+      const targetRoundForBye = isFinite(activeRound)
+        ? activeRound
+        : Math.max(...matches.map(m => m.roundNumber))
+
+      // Check if there's already a bye match in the current active round.
+      // If so, convert it to a real match against this late arrival — no queue needed.
+      const existingBye = matches.find(m =>
+        m.roundNumber === targetRoundForBye &&
+        m.isBye &&
+        m.status === 'complete' &&
+        m.player1 !== null &&
+        m.player2 === null
+      )
+
+      if (existingBye) {
+        const { data: updated, error: ue } = await supabase
+          .from('pool_matches')
+          .update({ player2_id: player.id, is_bye: false, status: 'pending', winner_id: null })
+          .eq('id', existingBye.id)
+          .select(`
+            id, round_number, match_number, table_number, is_bye, status, winner_id,
+            player1:pool_players!pool_matches_player1_id_fkey(id, name),
+            player2:pool_players!pool_matches_player2_id_fkey(id, name),
+            winner:pool_players!pool_matches_winner_id_fkey(id, name)
+          `)
+        if (ue) throw new Error(ue.message)
+        const realMatch = normalizeMatch(updated[0])
+        setMatches(prev => prev.map(m => m.id === existingBye.id ? realMatch : m))
+        setTimeout(() => setSvgKey(k => k + 1), 80)
+        return
+      }
+
       if (lateQueue) {
         // Pair with waiting player → create a new match
         const currentMatches = matches
@@ -832,18 +962,28 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
   // ── Derived positions ──────────────────────────────────────────────────────
   const maxRound   = rounds.length > 0 ? rounds[rounds.length - 1] : 1
   const finalMatch = layout.find(m => m.roundNumber === maxRound && m.indexInRound === 0)
-  const champX     = (finalMatch?.x ?? 0) + CARD_W + COL_GAP
-  const champY     = finalMatch?.centerY ?? 0
+
+  // Single-sided: champion card is to the right of the final.
+  // Double-sided: champion card floats above the final card (no room to the right).
+  const champX = isDouble
+    ? (finalMatch?.x ?? 0)
+    : (finalMatch?.x ?? 0) + CARD_W + COL_GAP
+  const champY = isDouble
+    ? (finalMatch?.centerY ?? 0) - CARD_H - VS_GAP / 2 - 68
+    : (finalMatch?.centerY ?? 0)
 
   const formattedDate = new Date(tournament.eventDate + 'T00:00:00').toLocaleDateString('en-AU', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 
-  const roundLabel = (count: number, round: number) =>
-    count === 1 ? 'FINAL'
-    : count === 2 ? 'SEMI-FINALS'
-    : count <= 4 ? 'QTR-FINALS'
-    : `ROUND ${round}`
+  // For double-sided, each round's "count" is only the left-side count (half the total).
+  const roundLabel = (totalCount: number, round: number) => {
+    const count = isDouble && round < maxRound ? Math.ceil(totalCount / 2) : totalCount
+    return count === 1 ? (isDouble && round < maxRound ? 'SEMI-FINAL' : 'FINAL')
+      : count === 2 ? 'SEMI-FINALS'
+      : count <= 4 ? 'QTR-FINALS'
+      : `ROUND ${round}`
+  }
 
   // ── Intro phase ────────────────────────────────────────────────────────────
   if (phase === 'intro') {
@@ -957,7 +1097,53 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
         >
           {/* Round labels */}
           {rounds.map(round => {
-            const count = layout.filter(m => m.roundNumber === round).length
+            const rMatches = layout.filter(m => m.roundNumber === round)
+            const count    = rMatches.length
+            const label    = roundLabel(count, round)
+            if (isDouble && round === maxRound) {
+              // Grand final — centred label
+              const fm = rMatches.find(m => m.side === 'center')
+              if (!fm) return null
+              return (
+                <div key={round} style={{
+                  position: 'absolute', left: fm.x, top: 0, width: CARD_W, textAlign: 'center',
+                  fontFamily: 'var(--font-jost)', fontSize: 10, fontWeight: 700,
+                  color: 'rgba(232,204,0,0.5)', letterSpacing: '0.22em',
+                  textShadow: '0 1px 6px rgba(0,0,0,0.4)',
+                }}>
+                  FINAL
+                </div>
+              )
+            }
+            if (isDouble) {
+              // Show label on left AND mirrored right positions
+              const leftMs  = rMatches.filter(m => m.side === 'left')
+              const rightMs = rMatches.filter(m => m.side === 'right')
+              const leftX   = leftMs[0]?.x ?? (round - 1) * ROUND_W
+              const rightX  = rightMs[0]?.x
+              return (
+                <React.Fragment key={round}>
+                  <div style={{
+                    position: 'absolute', left: leftX, top: 0, width: CARD_W, textAlign: 'center',
+                    fontFamily: 'var(--font-jost)', fontSize: 10, fontWeight: 700,
+                    color: 'rgba(255,255,255,0.25)', letterSpacing: '0.22em',
+                    textShadow: '0 1px 6px rgba(0,0,0,0.4)',
+                  }}>
+                    {label}
+                  </div>
+                  {rightX !== undefined && (
+                    <div style={{
+                      position: 'absolute', left: rightX, top: 0, width: CARD_W, textAlign: 'center',
+                      fontFamily: 'var(--font-jost)', fontSize: 10, fontWeight: 700,
+                      color: 'rgba(255,255,255,0.25)', letterSpacing: '0.22em',
+                      textShadow: '0 1px 6px rgba(0,0,0,0.4)',
+                    }}>
+                      {label}
+                    </div>
+                  )}
+                </React.Fragment>
+              )
+            }
             return (
               <div key={round} style={{
                 position: 'absolute', left: (round - 1) * ROUND_W, top: 0,
@@ -966,13 +1152,13 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
                 color: 'rgba(255,255,255,0.25)', letterSpacing: '0.22em',
                 textShadow: '0 1px 6px rgba(0,0,0,0.4)',
               }}>
-                {roundLabel(count, round)}
+                {label}
               </div>
             )
           })}
 
-          {/* Champion column label */}
-          {finalMatch && (
+          {/* Champion column label — single-sided only (double-sided uses banner) */}
+          {!isDouble && finalMatch && (
             <div style={{
               position: 'absolute', left: champX, top: 0,
               width: CARD_W, textAlign: 'center',
@@ -1029,23 +1215,25 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
               {champion && finalMatch && (
                 <motion.div
                   key="champion-card"
-                  initial={{ opacity: 0, scale: 0.8, x: 18 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  initial={{ opacity: 0, scale: 0.8, y: isDouble ? 10 : 0, x: isDouble ? 0 : 18 }}
+                  animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
                   transition={{ duration: 0.65, ease: [0.22, 0.61, 0.36, 1] }}
                   style={{
                     position: 'absolute',
                     left: champX,
-                    top: champY - CARD_H / 2 - 24,
+                    top: isDouble ? champY : champY - CARD_H / 2 - 24,
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{
-                    fontFamily: 'var(--font-jost)', fontSize: 10, fontWeight: 700,
-                    color: '#E8CC00', letterSpacing: '0.24em', marginBottom: 7,
-                    textShadow: '0 0 20px rgba(232,204,0,0.6)',
-                  }}>
-                    🏆 CHAMPION
-                  </div>
+                  {!isDouble && (
+                    <div style={{
+                      fontFamily: 'var(--font-jost)', fontSize: 10, fontWeight: 700,
+                      color: '#E8CC00', letterSpacing: '0.24em', marginBottom: 7,
+                      textShadow: '0 0 20px rgba(232,204,0,0.6)',
+                    }}>
+                      🏆 CHAMPION
+                    </div>
+                  )}
                   <div style={{
                     width: CARD_W, height: CARD_H, borderRadius: 9,
                     background: 'linear-gradient(135deg, #E8CC00 0%, #E8820A 100%)',
@@ -1054,12 +1242,12 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
                     padding: '0 16px',
                   }}>
                     <span style={{
-                    fontFamily: 'var(--font-jost)', fontSize: 15, fontWeight: 900,
+                      fontFamily: 'var(--font-jost)', fontSize: 15, fontWeight: 900,
                       color: 'white', letterSpacing: '0.08em',
                       textTransform: 'uppercase',
                       textShadow: '0 1px 6px rgba(0,0,0,0.3)',
-                  }}>
-                    {champion.name}
+                    }}>
+                      {champion.name}
                     </span>
                   </div>
                 </motion.div>
