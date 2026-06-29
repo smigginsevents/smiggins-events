@@ -346,12 +346,12 @@ function BrandingPoolBall({ hue, size }: { hue: 'orange' | 'yellow'; size: numbe
 
 // ─── Top-centre branding bar ──────────────────────────────────────────────────
 function Branding({ name, date }: { name: string; date: string }) {
-  const ballSize = 30
+  const ballSize = 38
   const poolLetterStyle: React.CSSProperties = {
     fontFamily: 'var(--font-jost)',
     fontWeight: 900,
     color: 'white',
-    fontSize: 20,
+    fontSize: 30,
     letterSpacing: '0.05em',
     lineHeight: 1,
     textShadow: '0 1px 6px rgba(0,0,0,0.5)',
@@ -360,22 +360,15 @@ function Branding({ name, date }: { name: string; date: string }) {
     <div
       style={{
         position: 'fixed',
-        top: 16,
+        top: 18,
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 30,
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
+        gap: 16,
         pointerEvents: 'none',
-        height: 52,
-        padding: '0 20px',
-        background: 'rgba(0,0,0,0.35)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        borderRadius: 28,
-        border: '1px solid rgba(255,255,255,0.1)',
         whiteSpace: 'nowrap',
       }}
     >
@@ -384,11 +377,8 @@ function Branding({ name, date }: { name: string; date: string }) {
       <img
         src="/smigginslogo-white.png"
         alt="Smiggins"
-        style={{ height: 28, objectFit: 'contain', opacity: 0.85 }}
+        style={{ height: 44, objectFit: 'contain' }}
       />
-
-      {/* Divider */}
-      <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
 
       {/* P [OrangeBall] [YellowBall] L  COMP */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -396,30 +386,23 @@ function Branding({ name, date }: { name: string; date: string }) {
         <BrandingPoolBall hue="orange" size={ballSize} />
         <BrandingPoolBall hue="yellow" size={ballSize} />
         <span style={poolLetterStyle}>L</span>
-        <span style={{
-          fontFamily: 'var(--font-jost)', fontWeight: 700,
-          color: 'rgba(255,255,255,0.55)', fontSize: 12,
-          letterSpacing: '0.26em', marginLeft: 6,
-          textShadow: '0 1px 4px rgba(0,0,0,0.4)',
-        }}>
-          COMP
-        </span>
+        <span style={{ ...poolLetterStyle, marginLeft: 12 }}>COMP</span>
       </div>
 
       {/* Divider */}
-      <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+      <div style={{ width: 1, height: 34, background: 'rgba(255,255,255,0.15)', flexShrink: 0, marginLeft: 6 }} />
 
       {/* Tournament name + date */}
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
         <div style={{
-          fontFamily: 'var(--font-jost)', fontSize: 12, fontWeight: 700,
+          fontFamily: 'var(--font-jost)', fontSize: 13, fontWeight: 700,
           color: 'rgba(255,255,255,0.72)', letterSpacing: '0.08em',
           textTransform: 'uppercase',
         }}>
           {name}
         </div>
         <div style={{
-          fontFamily: 'var(--font-jost)', fontSize: 10,
+          fontFamily: 'var(--font-jost)', fontSize: 11,
           color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em',
         }}>
           {date}
