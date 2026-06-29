@@ -300,7 +300,7 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/smigginslogo-white.png" alt="Smiggins"
-            style={{ height: 'clamp(72px, 8vw, 104px)', objectFit: 'contain', opacity: 0.9, marginBottom: 'clamp(18px, 2.6vw, 32px)' }}
+            style={{ height: 'clamp(80px, 9vw, 116px)', objectFit: 'contain', opacity: 0.9, marginBottom: 'clamp(6px, 0.8vw, 10px)' }}
           />
 
           {/* P [🟠5] [🟡1] L  →  "POOL" with balls as the OO */}
@@ -313,37 +313,37 @@ export function TournamentManager({ tournament, entries, allPlayers }: Props) {
             {/* P */}
             <span style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(6rem, 10vw, 11.5rem)',
+              fontSize: 'clamp(7rem, 12vw, 14rem)',
               color: 'white', lineHeight: 1, letterSpacing: '-0.02em',
-              textShadow: '0 6px 48px rgba(0,0,0,0.6)',
+              textShadow: '0 6px 56px rgba(0,0,0,0.6)',
             }}>P</span>
 
             {/* 5-ball (orange) */}
-            <PoolBall hue="orange" size={116} />
+            <PoolBall hue="orange" size={140} />
 
             {/* 1-ball (yellow) */}
-            <PoolBall hue="yellow" size={116} />
+            <PoolBall hue="yellow" size={140} />
 
             {/* L */}
             <span style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(6rem, 10vw, 11.5rem)',
+              fontSize: 'clamp(7rem, 12vw, 14rem)',
               color: 'white', lineHeight: 1, letterSpacing: '-0.02em',
-              textShadow: '0 6px 48px rgba(0,0,0,0.6)',
+              textShadow: '0 6px 56px rgba(0,0,0,0.6)',
             }}>L</span>
           </motion.div>
 
-          {/* COMP — tight against POOL row */}
+          {/* COMP — pulled tight against POOL row */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.3 }}
             style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(3.2rem, 5.6vw, 6.4rem)',
+              fontSize: 'clamp(3.8rem, 6.6vw, 7.8rem)',
               color: 'white', letterSpacing: '0.32em',
-              lineHeight: 1, marginTop: 0,
-              textShadow: '0 4px 28px rgba(0,0,0,0.5)',
+              lineHeight: 1, marginTop: '-4px',
+              textShadow: '0 4px 32px rgba(0,0,0,0.5)',
             }}
           >
             COMP
