@@ -5,6 +5,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+// ─── Helper: normalise raw DB row → Match ─────────────────────────────────────
+function normalizeMatch(m: any): Match {
+  return {
+    id: m.id, roundNumber: m.round_number, matchNumber: m.match_number,
+    tableNumber: m.table_number, isBye: m.is_bye, status: m.status,
+    player1: m.player1 ? { id: m.player1.id, name: m.player1.name } : null,
+    player2: m.player2 ? { id: m.player2.id, name: m.player2.name } : null,
+    winner:  m.winner  ? { id: m.winner.id,  name: m.winner.name  } : null,
+  }
+}
+
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const CARD_H    = 50    // player card height (px)
 const CARD_W    = 182   // player card width (px)
@@ -390,6 +401,27 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
   const [scale, setScale]            = useState(1)
   const containerRef                 = useRef<HTMLDivElement>(null)
 
+  // ── Late arrival state ─────────────────────────────────────────────────────
+  const [showLatePanel, setShowLatePanel] = useState(false)
+  const [lateQueue, setLateQueue]         = useState<Player | null>(null)   // one unmatched player
+  const [lateSearch, setLateSearch]       = useState('')
+  const [lateAdding, setLateAdding]       = useState(false)
+  const [allPlayers, setAllPlayers]       = useState<Player[]>([])
+  const lateInputRef                      = useRef<HTMLInputElement>(null)
+
+  // Fetch all known players when panel opens
+  useEffect(() => {
+    if (!showLatePanel || allPlayers.length > 0) return
+    const supabase = createClient()
+    supabase.from('pool_players').select('id, name').order('name').then(({ data }) => {
+      if (data) setAllPlayers(data.map((p: any) => ({ id: p.id, name: p.name })))
+    })
+  }, [showLatePanel, allPlayers.length])
+
+  useEffect(() => {
+    if (showLatePanel) setTimeout(() => lateInputRef.current?.focus(), 180)
+  }, [showLatePanel])
+
   // ── Champion ───────────────────────────────────────────────────────────────
   const champion = useMemo<Player | null>(() => {
     if (matches.length === 0) return null
@@ -540,6 +572,139 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
 
     setMatches(prev => [...prev, ...newMatches])
     setTimeout(() => setSvgKey(k => k + 1), 80)
+  }
+
+  // ── Late arrival: add player ───────────────────────────────────────────────
+  async function handleAddLatePlayer(playerName: string) {
+    const trimmed = playerName.trim()
+    if (!trimmed || lateAdding) return
+    setLateAdding(true)
+    setLateSearch('')
+
+    try {
+      const supabase = createClient()
+
+      // Get or create player
+      let player: Player
+      const { data: existing } = await supabase
+        .from('pool_players').select('id, name').ilike('name', trimmed).single()
+      if (existing) {
+        player = existing
+      } else {
+        const { data: created, error: ce } = await supabase
+          .from('pool_players').insert({ name: trimmed }).select('id, name').single()
+        if (ce) throw new Error(ce.message)
+        player = created
+      }
+
+      // Add tournament entry (ignore duplicate)
+      await supabase.from('pool_tournament_entries')
+        .insert({ tournament_id: tournament.id, player_id: player.id })
+        .select()
+
+      if (lateQueue) {
+        // Pair with waiting player → create a new match
+        const currentMatches = matches
+        const activeRound = currentMatches
+          .filter(m => m.status === 'pending' && !m.isBye)
+          .reduce<number>((min, m) => Math.min(min, m.roundNumber), Infinity)
+        const targetRound = isFinite(activeRound)
+          ? activeRound
+          : Math.max(...currentMatches.map(m => m.roundNumber))
+        const maxMatch = Math.max(...currentMatches.map(m => m.matchNumber))
+        const tableNum = (maxMatch % 2) + 1
+
+        const { data, error } = await supabase.from('pool_matches').insert({
+          tournament_id: tournament.id,
+          round_number:  targetRound,
+          match_number:  maxMatch + 1,
+          table_number:  tableNum,
+          player1_id:    lateQueue.id,
+          player2_id:    player.id,
+          is_bye:        false,
+          status:        'pending',
+          winner_id:     null,
+        }).select(`
+          id, round_number, match_number, table_number, is_bye, status, winner_id,
+          player1:pool_players!pool_matches_player1_id_fkey(id, name),
+          player2:pool_players!pool_matches_player2_id_fkey(id, name),
+          winner:pool_players!pool_matches_winner_id_fkey(id, name)
+        `)
+
+        if (error) throw new Error(error.message)
+        const newMatch = normalizeMatch(data[0])
+        setMatches(prev => [...prev, newMatch])
+        setLateQueue(null)
+        setTimeout(() => setSvgKey(k => k + 1), 80)
+      } else {
+        // No partner yet — place in queue
+        setLateQueue(player)
+      }
+    } catch (e: any) {
+      alert('Error adding late player: ' + e.message)
+    } finally {
+      setLateAdding(false)
+      lateInputRef.current?.focus()
+    }
+  }
+
+  // ── Late arrival: give queued player a bye ─────────────────────────────────
+  async function handleLateBye() {
+    if (!lateQueue || lateAdding) return
+    setLateAdding(true)
+    try {
+      const supabase = createClient()
+      const currentMatches = matches
+      const activeRound = currentMatches
+        .filter(m => m.status === 'pending' && !m.isBye)
+        .reduce<number>((min, m) => Math.min(min, m.roundNumber), Infinity)
+      const targetRound = isFinite(activeRound)
+        ? activeRound
+        : Math.max(...currentMatches.map(m => m.roundNumber))
+      const maxMatch = Math.max(...currentMatches.map(m => m.matchNumber))
+
+      const { data, error } = await supabase.from('pool_matches').insert({
+        tournament_id: tournament.id,
+        round_number:  targetRound,
+        match_number:  maxMatch + 1,
+        table_number:  1,
+        player1_id:    lateQueue.id,
+        player2_id:    null,
+        is_bye:        true,
+        status:        'complete',
+        winner_id:     lateQueue.id,
+      }).select(`
+        id, round_number, match_number, table_number, is_bye, status, winner_id,
+        player1:pool_players!pool_matches_player1_id_fkey(id, name),
+        player2:pool_players!pool_matches_player2_id_fkey(id, name),
+        winner:pool_players!pool_matches_winner_id_fkey(id, name)
+      `)
+
+      if (error) throw new Error(error.message)
+      const newMatch = normalizeMatch(data[0])
+      setMatches(prev => [...prev, newMatch])
+      setLateQueue(null)
+      setTimeout(() => setSvgKey(k => k + 1), 80)
+
+      // Check if round is now complete (all matches done)
+      const allMatches = [...matches, newMatch]
+      const roundMs = allMatches.filter(m => m.roundNumber === targetRound)
+      const allDone = roundMs.every(m => m.status === 'complete' || m.isBye)
+      if (allDone) {
+        const winners = roundMs
+          .sort((a, b) => a.matchNumber - b.matchNumber)
+          .map(m => m.winner!).filter(Boolean)
+        if (winners.length === 1) {
+          await supabase.from('pool_tournaments').update({ status: 'complete' }).eq('id', tournament.id)
+        } else if (winners.length > 1) {
+          await spawnNextRound(supabase, targetRound, allMatches, winners)
+        }
+      }
+    } catch (e: any) {
+      alert('Error giving bye: ' + e.message)
+    } finally {
+      setLateAdding(false)
+    }
   }
 
   // ── Derived positions ──────────────────────────────────────────────────────
@@ -805,6 +970,245 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
           DRAWING…
         </motion.div>
       )}
+
+      {/* ── Late arrival FAB ──────────────────────────────────────────────── */}
+      {phase === 'bracket' && !champion && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 2.5, type: 'spring', stiffness: 280, damping: 22 }}
+          onClick={() => setShowLatePanel(p => !p)}
+          whileHover={{ scale: 1.08, boxShadow: '0 8px 32px rgba(21,103,165,0.45)' }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            position: 'fixed', bottom: 24, right: 28, zIndex: 40,
+            background: showLatePanel
+              ? 'rgba(6,14,42,0.9)'
+              : 'linear-gradient(135deg, rgba(21,80,165,0.85) 0%, rgba(8,28,88,0.92) 100%)',
+            border: `1px solid ${showLatePanel ? 'rgba(255,255,255,0.18)' : 'rgba(96,165,250,0.3)'}`,
+            borderRadius: 14,
+            padding: '10px 20px',
+            backdropFilter: 'blur(16px)',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontFamily: 'var(--font-jost)', fontWeight: 700,
+            fontSize: '0.78rem', letterSpacing: '0.14em',
+            color: showLatePanel ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.88)',
+            boxShadow: showLatePanel ? 'none' : '0 4px 24px rgba(21,103,165,0.3)',
+            transition: 'background 0.2s, color 0.2s, border-color 0.2s',
+          }}
+        >
+          {showLatePanel ? (
+            <><span style={{ fontSize: '0.9rem' }}>✕</span><span>CLOSE</span></>
+          ) : (
+            <><span style={{ fontSize: '1rem' }}>+</span><span>LATE ARRIVAL</span></>
+          )}
+          {lateQueue && !showLatePanel && (
+            <span style={{
+              background: '#E8820A', color: 'white', borderRadius: '50%',
+              width: 18, height: 18, fontSize: '0.6rem', fontWeight: 900,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginLeft: 2,
+            }}>1</span>
+          )}
+        </motion.button>
+      )}
+
+      {/* ── Late arrival slide-up panel ───────────────────────────────────── */}
+      <AnimatePresence>
+        {showLatePanel && phase === 'bracket' && (
+          <motion.div
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            style={{
+              position: 'fixed', bottom: 80, right: 28, zIndex: 39,
+              width: 380,
+              background: 'rgba(4,10,30,0.94)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 18,
+              padding: '24px 24px 20px',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+              fontFamily: 'var(--font-jost)',
+            }}
+          >
+            {/* Panel header */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{
+                fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.22em',
+                color: 'rgba(255,255,255,0.35)', marginBottom: 4,
+              }}>
+                LATE ARRIVAL
+              </div>
+              <div style={{
+                fontSize: '1.1rem', fontWeight: 800,
+                color: 'rgba(255,255,255,0.88)',
+                letterSpacing: '0.03em',
+              }}>
+                Add Player to Draw
+              </div>
+              <div style={{
+                fontSize: '0.72rem', color: 'rgba(255,255,255,0.25)',
+                marginTop: 5, lineHeight: 1.5,
+              }}>
+                {lateQueue
+                  ? `Waiting for a partner for ${lateQueue.name} — add a second player to create a match, or give them a bye.`
+                  : 'Add a player to the draw. They\'ll be paired when a second late arrival joins.'}
+              </div>
+            </div>
+
+            {/* Waiting player badge */}
+            <AnimatePresence>
+              {lateQueue && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  style={{
+                    background: 'rgba(232,130,10,0.15)',
+                    border: '1px solid rgba(232,130,10,0.3)',
+                    borderRadius: 10, padding: '10px 14px',
+                    marginBottom: 14,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: 'rgba(232,130,10,0.7)', letterSpacing: '0.15em', marginBottom: 2 }}>
+                      WAITING FOR PARTNER
+                    </div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)' }}>
+                      {lateQueue.name}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleLateBye}
+                    disabled={lateAdding}
+                    style={{
+                      background: 'rgba(232,130,10,0.2)', border: '1px solid rgba(232,130,10,0.4)',
+                      borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+                      fontFamily: 'var(--font-jost)', fontWeight: 700,
+                      fontSize: '0.7rem', letterSpacing: '0.12em',
+                      color: 'rgba(232,130,10,0.9)',
+                    }}
+                  >
+                    GIVE BYE
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Search input */}
+            <div style={{ position: 'relative', marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  ref={lateInputRef}
+                  type="text"
+                  placeholder={lateQueue ? 'Add second player…' : 'Enter player name…'}
+                  value={lateSearch}
+                  onChange={e => setLateSearch(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && lateSearch.trim() && handleAddLatePlayer(lateSearch)}
+                  style={{
+                    flex: 1,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: 9,
+                    padding: '11px 16px',
+                    color: 'rgba(255,255,255,0.9)',
+                    fontSize: '0.95rem',
+                    fontFamily: 'var(--font-jost)', fontWeight: 500,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={e => { e.target.style.borderColor = 'rgba(96,165,250,0.55)' }}
+                  onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.14)' }}
+                />
+                <button
+                  onClick={() => lateSearch.trim() && handleAddLatePlayer(lateSearch)}
+                  disabled={!lateSearch.trim() || lateAdding}
+                  style={{
+                    background: 'rgba(21,103,165,0.65)',
+                    border: '1px solid rgba(96,165,250,0.2)',
+                    borderRadius: 9, padding: '0 18px',
+                    fontFamily: 'var(--font-jost)', fontWeight: 700,
+                    fontSize: '0.78rem', letterSpacing: '0.1em',
+                    color: 'white', cursor: 'pointer',
+                    opacity: !lateSearch.trim() || lateAdding ? 0.4 : 1,
+                    transition: 'opacity 0.15s',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {lateAdding ? '…' : lateQueue ? 'PAIR' : 'ADD'}
+                </button>
+              </div>
+
+              {/* Suggestions */}
+              <AnimatePresence>
+                {lateSearch.trim() && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.12 }}
+                    style={{
+                      position: 'absolute', top: '110%', left: 0, right: 56,
+                      background: 'rgba(6,14,42,0.97)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 9, overflow: 'hidden', zIndex: 10,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    {allPlayers
+                      .filter(p => p.name.toLowerCase().includes(lateSearch.toLowerCase()))
+                      .filter(p => !matches.some(m => m.player1?.id === p.id || m.player2?.id === p.id))
+                      .slice(0, 4)
+                      .map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => handleAddLatePlayer(p.name)}
+                          style={{
+                            width: '100%', textAlign: 'left', background: 'none',
+                            border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            cursor: 'pointer', padding: '10px 14px',
+                            fontFamily: 'var(--font-jost)', fontSize: '0.9rem',
+                            color: 'rgba(255,255,255,0.78)',
+                            display: 'flex', justifyContent: 'space-between',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                        >
+                          <span>{p.name}</span>
+                          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em' }}>RETURNING</span>
+                        </button>
+                      ))
+                    }
+                    {lateSearch.trim() && !allPlayers.some(p => p.name.toLowerCase() === lateSearch.toLowerCase()) && (
+                      <button
+                        onClick={() => handleAddLatePlayer(lateSearch)}
+                        style={{
+                          width: '100%', textAlign: 'left', background: 'none',
+                          border: 'none', cursor: 'pointer', padding: '10px 14px',
+                          fontFamily: 'var(--font-jost)', fontSize: '0.9rem',
+                          color: 'rgba(96,165,250,0.85)',
+                          display: 'flex', gap: 8, alignItems: 'center',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        <span>+</span><span>Add &ldquo;{lateSearch.trim()}&rdquo; as new player</span>
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
