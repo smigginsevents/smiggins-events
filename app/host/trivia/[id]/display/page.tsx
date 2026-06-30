@@ -664,32 +664,38 @@ export default function DisplayPage() {
         {/* ── ROUND END ───────────────────────────────────────────────────────── */}
         {phase === 'round_end' && currentRound && (
           <motion.div key={`round-end-${currentRound.id}`} {...pop} transition={{ duration: 0.5 }}
-            className="absolute inset-0 flex flex-col items-center justify-center z-10 gap-8"
+            className="absolute inset-0 flex flex-col items-center justify-center z-10"
           >
             <SnowfallEffect />
-            <div className="relative z-10 text-center">
+            <div className="relative z-10 text-center px-12">
               <motion.div
                 initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.6, ease: 'backOut' }}
-                className="font-display text-8xl text-white tracking-wide mb-4"
+                className="font-display text-white tracking-wide"
+                style={{ fontSize: 'clamp(4rem, 12vw, 18rem)', lineHeight: 1 }}
               >
                 ROUND {currentRound.round_number}
               </motion.div>
               <motion.div
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="font-display text-5xl text-rust tracking-wide mb-8"
+                className="font-display text-rust tracking-wide"
+                style={{ fontSize: 'clamp(2.5rem, 7vw, 10rem)', lineHeight: 1, marginTop: '0.2em' }}
               >
                 COMPLETE
               </motion.div>
               {(currentRound.round_number % 2 === 0) && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.8, type: 'spring', stiffness: 200 }}
-                  className="bg-mustard/20 border-2 border-mustard rounded-2xl px-8 py-5 inline-block"
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                  style={{ marginTop: '3vh' }}
                 >
-                  <p className="text-mustard font-display text-3xl tracking-wide">SWAP YOUR ANSWER SHEETS!</p>
-                  <p className="text-mustard/60 text-sm mt-1">Pass to the team on your left</p>
+                  <p className="font-display text-mustard tracking-wide" style={{ fontSize: 'clamp(1.8rem, 4vw, 6rem)' }}>
+                    SWAP YOUR ANSWER SHEETS!
+                  </p>
+                  <p className="text-mustard/50" style={{ fontSize: 'clamp(1rem, 1.8vw, 2.5rem)', marginTop: '0.5em' }}>
+                    Pass to the team on your left
+                  </p>
                 </motion.div>
               )}
             </div>
@@ -702,77 +708,68 @@ export default function DisplayPage() {
             className="absolute inset-0 flex flex-col items-center justify-center z-10 px-16 gap-8"
           >
             {/* Progress */}
-            <div className="absolute top-8 left-0 right-0 px-16 flex items-center justify-between">
-              <span className="bg-timber/30 text-timber/80 font-display text-lg px-4 py-1.5 rounded-full uppercase tracking-wide">
+            <div className="absolute top-6 left-0 right-0 px-12 flex items-center justify-between">
+              <span className="font-display text-white/40 uppercase tracking-[0.3em]" style={{ fontSize: 'clamp(0.8rem, 1.5vw, 2rem)' }}>
                 Marking
               </span>
-              <span className="text-white/40 font-display text-xl">
+              <span className="text-white/40 font-display" style={{ fontSize: 'clamp(0.8rem, 1.5vw, 2rem)' }}>
                 {(liveState?.marking_question_index ?? 0) + 1} / {markingQuestions.length}
               </span>
             </div>
 
             {currentMarkingQ && (
-              <div className="text-center max-w-4xl w-full">
+              <div className="text-center w-full px-12">
                 {/* Round indicator */}
-                <p className="text-white/30 text-sm uppercase tracking-widest mb-4">
+                <p className="text-white/35 uppercase tracking-widest" style={{ fontSize: 'clamp(0.75rem, 1.2vw, 1.6rem)', marginBottom: '1.5vh' }}>
                   Round {markingRound?.round_number} · Q{currentMarkingQ.question_number}
                   {currentMarkingQ.points > 1 && <span className="text-mustard ml-2">({currentMarkingQ.points} pts)</span>}
                 </p>
 
                 {/* Question */}
-                <h2 className="text-4xl font-semibold text-white leading-tight mb-8">
+                <h2 className="font-semibold text-white leading-tight" style={{ fontSize: 'clamp(1.8rem, 3.8vw, 6rem)', marginBottom: '3vh' }}>
                   {currentMarkingQ.question_text}
                 </h2>
 
-                {/* Multiple choice options (shown during marking) */}
+                {/* Multiple choice options */}
                 {currentMarkingQ.multiple_choice_options && Array.isArray(currentMarkingQ.multiple_choice_options) && (
-                  <div className="grid grid-cols-2 gap-3 w-full max-w-3xl mx-auto mb-8">
+                  <div className="grid grid-cols-2 gap-3 w-full max-w-4xl mx-auto" style={{ marginBottom: '2.5vh' }}>
                     {(currentMarkingQ.multiple_choice_options as string[]).map((opt, i) => {
                       const isCorrect = liveState?.marking_revealed && currentMarkingQ.correct_option_index === i
                       return (
-                        <div key={i} className={`flex items-center gap-4 border rounded-xl px-6 py-4 transition-all duration-500 ${
+                        <div key={i} className={`flex items-center gap-4 border rounded-xl transition-all duration-500 ${
                           isCorrect ? MC_CORRECT : liveState?.marking_revealed ? 'border-white/5 bg-white/3 opacity-40' : MC_COLORS[i]
-                        }`}>
-                          <span className={`font-display text-2xl w-8 ${isCorrect ? 'text-pine' : 'text-white/60'}`}>{MC_LABELS[i]}</span>
-                          <span className={`text-lg font-medium ${isCorrect ? 'text-pine font-bold' : 'text-white'}`}>{opt}</span>
-                          {isCorrect && <span className="ml-auto text-pine text-2xl">✓</span>}
+                        }`} style={{ padding: '1.5vh 2vw' }}>
+                          <span className={`font-display shrink-0 ${isCorrect ? 'text-pine' : 'text-white/60'}`} style={{ fontSize: 'clamp(1.2rem, 2.5vw, 4rem)' }}>{MC_LABELS[i]}</span>
+                          <span className={`font-medium ${isCorrect ? 'text-pine font-bold' : 'text-white'}`} style={{ fontSize: 'clamp(1rem, 2vw, 3rem)' }}>{opt}</span>
+                          {isCorrect && <span className="ml-auto text-pine" style={{ fontSize: 'clamp(1rem, 2vw, 3rem)' }}>✓</span>}
                         </div>
                       )
                     })}
                   </div>
                 )}
 
-                {/* Answer reveal — springs in, then text scrambles into the answer */}
+                {/* Answer reveal — no box, big orange ScrambleText */}
                 <AnimatePresence>
                   {liveState?.marking_revealed && (
                     <motion.div
-                      initial={{ y: 70, opacity: 0, scale: 0.88 }}
-                      animate={{ y: 0, opacity: 1, scale: 1 }}
-                      exit={{ y: -30, opacity: 0, scale: 0.95 }}
+                      initial={{ y: 40, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ opacity: 0 }}
                       transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-                      className="w-full max-w-4xl mx-auto"
-                      style={{ marginTop: '1vh' }}
+                      style={{ marginTop: '2vh' }}
                     >
-                      <div style={{
-                        background: 'rgba(23,64,47,0.45)',
-                        border: '2px solid rgba(35,100,60,0.7)',
-                        borderRadius: 20,
-                        padding: '2.5vh 4vw',
-                        textAlign: 'center',
-                        boxShadow: '0 0 80px rgba(35,100,60,0.35), inset 0 0 40px rgba(35,100,60,0.1)',
-                      }}>
-                        <motion.p
-                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
-                          style={{ color: 'rgba(100,200,120,0.6)', fontSize: 'clamp(0.55rem, 0.9vw, 1.1rem)', letterSpacing: '0.35em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '1vh' }}
-                        >
-                          Correct Answer
-                        </motion.p>
-                        <div style={{ fontSize: 'clamp(1.8rem, 4vw, 6rem)', lineHeight: 1.1, minHeight: '1.2em' }}>
-                          {markingAnswer
-                            ? <ScrambleText text={markingAnswer} />
-                            : <span style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'var(--font-jost)', fontWeight: 900 }}>···</span>
-                          }
-                        </div>
+                      <motion.p
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+                        className="text-white/35 uppercase tracking-[0.3em]"
+                        style={{ fontSize: 'clamp(0.6rem, 1vw, 1.4rem)', marginBottom: '0.8vh' }}
+                      >
+                        Correct Answer
+                      </motion.p>
+                      <div style={{ fontSize: 'clamp(2.5rem, 6vw, 9rem)', lineHeight: 1.1, color: '#E0A53C', minHeight: '1.2em' }}>
+                        {markingAnswer
+                          ? <ScrambleText text={markingAnswer} />
+                          : <span style={{ color: 'rgba(224,165,60,0.3)' }}>···</span>
+                        }
                       </div>
                     </motion.div>
                   )}
@@ -788,29 +785,33 @@ export default function DisplayPage() {
             className="absolute inset-0 flex flex-col items-center justify-center z-10 gap-8"
           >
             <SnowfallEffect />
-            <div className="relative z-10 text-center">
+            <div className="relative z-10 text-center px-12">
               <motion.h1
                 initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.6, ease: 'backOut' }}
-                className="font-display text-9xl text-white tracking-wide mb-4"
+                className="font-display text-white tracking-wide"
+                style={{ fontSize: 'clamp(5rem, 15vw, 22rem)', lineHeight: 1 }}
               >
                 BREAK
               </motion.h1>
               <motion.h2
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-                className="font-display text-4xl text-rust tracking-wide mb-8"
+                className="font-display text-rust tracking-wide"
+                style={{ fontSize: 'clamp(2.5rem, 6vw, 9rem)', lineHeight: 1, marginTop: '0.1em', marginBottom: '0.5em' }}
               >
                 TIME
               </motion.h2>
               <motion.p
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
-                className="text-white/50 text-xl max-w-lg mx-auto"
+                className="text-white/60 mx-auto"
+                style={{ fontSize: 'clamp(1.2rem, 2.4vw, 3.5rem)', maxWidth: '70vw', lineHeight: 1.4 }}
               >
                 Grab a beverage or use the bathroom while Freddy tallies your scores.
               </motion.p>
               <motion.p
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }}
-                className="text-white/25 text-sm mt-4 uppercase tracking-widest"
+                className="text-white/30 uppercase tracking-widest"
+                style={{ fontSize: 'clamp(0.8rem, 1.4vw, 2rem)', marginTop: '1.5vh' }}
               >
                 Leaderboard coming up soon…
               </motion.p>
