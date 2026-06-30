@@ -250,7 +250,7 @@ export default function DisplayPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-navy flex items-center justify-center">
+      <div className="fixed inset-0 z-50 bg-smiggins-blue flex items-center justify-center">
         <div className="text-white/40 font-display text-3xl tracking-wide">Loading…</div>
       </div>
     )
@@ -259,7 +259,7 @@ export default function DisplayPage() {
   const phase = liveState?.phase ?? 'lobby'
 
   return (
-    <div className="min-h-screen bg-navy text-white overflow-hidden relative select-none">
+    <div className="fixed inset-0 z-50 bg-smiggins-blue text-white overflow-hidden select-none">
       <AnimatePresence mode="wait">
 
         {/* ── LOBBY ──────────────────────────────────────────────────────────── */}
