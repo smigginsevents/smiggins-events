@@ -7,6 +7,15 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 
+const DEFAULT_ROUNDS = [
+  { name: 'BRAIN DEFROST',              description: 'The brain is frozen. Time to thaw it.' },
+  { name: 'CULTURE VULTURE',            description: 'High culture. Low standards. Equally important.' },
+  { name: 'LEGENDARY',                  description: 'Some people leave a dent in the universe. This round is about those people.' },
+  { name: 'WHO THE PHO IS KOSCIUSZKO?', description: 'Local knowledge, mountain mystery, and snow-related suffering.' },
+  { name: 'SENSORY OVERLOAD',           description: 'What you are about to experience cannot be unexperienced.' },
+  { name: 'BRAIN SURGERY',              description: 'This is the final descent. Scoring is doubled. The mountain doesn\'t care about your feelings.' },
+]
+
 export default function NewTriviaEventPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -15,8 +24,8 @@ export default function NewTriviaEventPage() {
   const [form, setForm] = useState({
     name: '4 Pines Trivia Night',
     event_date: new Date().toISOString().split('T')[0],
-    num_rounds: 4,
-    questions_per_round: 10,
+    num_rounds: 6,
+    questions_per_round: 8,
     default_time_limit_seconds: 30,
   })
 
@@ -31,7 +40,6 @@ export default function NewTriviaEventPage() {
 
     const supabase = createClient()
 
-    // Create event
     const { data: event, error: eventError } = await supabase
       .from('trivia_events')
       .insert({
@@ -49,24 +57,25 @@ export default function NewTriviaEventPage() {
       return
     }
 
-    // Create rounds
-    const rounds = Array.from({ length: form.num_rounds }, (_, i) => ({
-      event_id: event.id,
-      round_number: i + 1,
-      name: `Round ${i + 1}`,
-    }))
+    // Build rounds — use pre-set names/descriptions for 6-round standard format
+    const rounds = Array.from({ length: form.num_rounds }, (_, i) => {
+      const preset = DEFAULT_ROUNDS[i]
+      return {
+        event_id: event.id,
+        round_number: i + 1,
+        name: preset?.name ?? `Round ${i + 1}`,
+        description: preset?.description ?? null,
+      }
+    })
 
-    const { error: roundsError } = await supabase
-      .from('trivia_rounds')
-      .insert(rounds)
+    const { error: roundsError } = await supabase.from('trivia_rounds').insert(rounds)
 
     if (roundsError) {
-      setError('Event created but rounds failed. Check the questions page.')
+      setError('Event created but rounds failed.')
       router.push(`/host/trivia/${event.id}/questions`)
       return
     }
 
-    // Create placeholder questions
     const { data: createdRounds } = await supabase
       .from('trivia_rounds')
       .select('id, round_number')
@@ -87,10 +96,11 @@ export default function NewTriviaEventPage() {
       await supabase.from('trivia_questions').insert(questions)
     }
 
-    // Create live state row
     await supabase.from('trivia_live_state').insert({
       event_id: event.id,
       phase: 'lobby',
+      marking_question_index: 0,
+      marking_revealed: false,
     })
 
     router.push(`/host/trivia/${event.id}/questions`)
@@ -153,20 +163,27 @@ export default function NewTriviaEventPage() {
               />
             </div>
           </div>
+
+          {form.num_rounds === 6 && (
+            <div className="mt-4 bg-snow rounded-lg p-3">
+              <p className="text-xs text-timber font-semibold uppercase tracking-wider mb-2">Round Names (pre-filled)</p>
+              <ul className="text-xs text-navy/60 flex flex-col gap-1">
+                {DEFAULT_ROUNDS.map((r, i) => (
+                  <li key={i}><span className="text-navy/40 mr-1">R{i + 1}</span>{r.name}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-navy/40 mt-2">Edit names &amp; descriptions on the questions page.</p>
+            </div>
+          )}
         </Card>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
 
         <div className="flex gap-3">
           <Button type="submit" loading={loading} size="lg">
-            Create & Build Questions
+            Create &amp; Build Questions
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="lg"
-            onClick={() => router.back()}
-          >
+          <Button type="button" variant="ghost" size="lg" onClick={() => router.back()}>
             Cancel
           </Button>
         </div>

@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Props {
   timerStartedAt: string | null
   durationSeconds: number
   onZero?: () => void
 }
+
+const RADIUS = 88
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 export function TimerBar({ timerStartedAt, durationSeconds, onZero }: Props) {
   const [remaining, setRemaining] = useState(durationSeconds)
@@ -26,7 +29,6 @@ export function TimerBar({ timerStartedAt, durationSeconds, onZero }: Props) {
       const elapsed = (Date.now() - new Date(timerStartedAt!).getTime()) / 1000
       const rem = Math.max(durationSeconds - elapsed, 0)
       setRemaining(rem)
-
       if (rem <= 0 && !firedRef.current) {
         firedRef.current = true
         onZeroRef.current?.()
@@ -34,31 +36,99 @@ export function TimerBar({ timerStartedAt, durationSeconds, onZero }: Props) {
     }
 
     tick()
-    const id = setInterval(tick, 100)
+    const id = setInterval(tick, 80)
     return () => clearInterval(id)
   }, [timerStartedAt, durationSeconds])
 
-  const pct = (remaining / durationSeconds) * 100
-  const isAmber = pct < 50 && pct >= 20
-  const isRed = pct < 20
+  const pct = remaining / durationSeconds
+  const secs = Math.ceil(remaining)
+  const offset = CIRCUMFERENCE * (1 - pct)
 
-  const barColor = isRed
-    ? 'bg-rust'
-    : isAmber
-    ? 'bg-mustard'
-    : 'bg-pine'
+  const isAmber = pct < 0.5 && pct >= 0.2
+  const isRed = pct < 0.2
+  const isDone = remaining <= 0
+
+  const ringColor = isDone ? '#ffffff' : isRed ? '#C8552D' : isAmber ? '#E0A53C' : '#4ade80'
+  const textColor = isDone ? 'text-white' : isRed ? 'text-rust' : isAmber ? 'text-mustard' : 'text-green-400'
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="text-5xl font-display text-white tracking-wide tabular-nums">
-        {Math.ceil(remaining)}
+    <div className="flex flex-col items-center gap-6">
+      {/* Circular countdown ring */}
+      <div className="relative" style={{ width: 200, height: 200 }}>
+        {/* Background track */}
+        <svg
+          width="200" height="200"
+          className="absolute inset-0 -rotate-90"
+          style={{ transform: 'rotate(-90deg)' }}
+        >
+          <circle
+            cx="100" cy="100" r={RADIUS}
+            fill="none"
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth="10"
+          />
+          <motion.circle
+            cx="100" cy="100" r={RADIUS}
+            fill="none"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            animate={{
+              strokeDashoffset: offset,
+              stroke: ringColor,
+            }}
+            transition={{ duration: 0.08, ease: 'linear' }}
+          />
+        </svg>
+
+        {/* Center number */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <AnimatePresence mode="popLayout">
+            {isDone ? (
+              <motion.span
+                key="done"
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="font-display text-5xl text-white tracking-wide"
+              >
+                TIME!
+              </motion.span>
+            ) : (
+              <motion.span
+                key={secs}
+                initial={{ scale: 1.3, opacity: 0 }}
+                animate={{
+                  scale: isRed && secs <= 5 ? [1, 1.08, 1] : 1,
+                  opacity: 1,
+                }}
+                exit={{ scale: 0.7, opacity: 0 }}
+                transition={{
+                  opacity: { duration: 0.12 },
+                  scale: isRed && secs <= 5
+                    ? { repeat: Infinity, duration: 0.6 }
+                    : { duration: 0.15 },
+                }}
+                className={`font-display text-7xl tabular-nums leading-none ${textColor}`}
+              >
+                {secs}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
-      <div className="w-full max-w-2xl h-4 rounded-full bg-white/10 overflow-hidden">
-        <motion.div
-          className={`h-full rounded-full transition-colors duration-500 ${barColor}`}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.1 }}
-        />
+
+      {/* Segmented progress bar */}
+      <div className="w-full max-w-lg">
+        <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+          <motion.div
+            className="h-full rounded-full"
+            animate={{
+              width: `${pct * 100}%`,
+              backgroundColor: ringColor,
+            }}
+            transition={{ duration: 0.08, ease: 'linear' }}
+          />
+        </div>
       </div>
     </div>
   )

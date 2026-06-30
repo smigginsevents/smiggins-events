@@ -90,6 +90,8 @@ export default function PreShowPage() {
       current_question_id: null,
       timer_started_at: null,
       leaderboard_revealed: false,
+      marking_question_index: 0,
+      marking_revealed: false,
       updated_at: new Date().toISOString(),
     })
 

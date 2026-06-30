@@ -3,10 +3,14 @@
 export type EventStatus = 'draft' | 'ready' | 'live' | 'complete'
 export type LivePhase =
   | 'lobby'
+  | 'game_overview'
   | 'round_intro'
   | 'question'
   | 'timer_running'
   | 'answer_reveal'
+  | 'round_end'
+  | 'marking'
+  | 'break'
   | 'round_leaderboard'
   | 'final_reveal'
   | 'complete'
@@ -34,6 +38,7 @@ export interface TriviaRound {
   event_id: string
   round_number: number
   name: string
+  description: string | null
   time_limit_seconds: number | null
 }
 
@@ -43,13 +48,15 @@ export interface TriviaQuestion {
   question_number: number
   question_text: string
   answer_text: string
+  multiple_choice_options: string[] | null
+  correct_option_index: number | null
   media_type: MediaType
   media_url: string | null
   media_storage_path: string | null
   points: number
 }
 
-/** Safe version — answer_text omitted — for the public display screen */
+/** Safe version — answer_text excluded — for the public display screen */
 export type TriviaQuestionPublic = Omit<TriviaQuestion, 'answer_text'>
 
 export interface TriviaEventTeam {
@@ -74,6 +81,8 @@ export interface TriviaLiveState {
   phase: LivePhase
   timer_started_at: string | null
   leaderboard_revealed: boolean
+  marking_question_index: number
+  marking_revealed: boolean
   updated_at: string
 }
 
