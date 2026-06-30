@@ -901,7 +901,7 @@ export default function DisplayPage() {
         {/* ── BREAK LEADERBOARD ───────────────────────────────────────────────── */}
         {phase === 'break' && liveState?.leaderboard_revealed && (
           <motion.div key="break-leaderboard" {...slide} transition={{ duration: 0.5 }}
-            className="absolute inset-0 flex flex-col items-center justify-center z-10 py-16"
+            className="absolute inset-0 z-10"
           >
             <ShowLeaderboard
               entries={leaderboard}
@@ -917,7 +917,7 @@ export default function DisplayPage() {
         {/* ── ROUND LEADERBOARD ───────────────────────────────────────────────── */}
         {phase === 'round_leaderboard' && (
           <motion.div key="round-leaderboard" {...slide} transition={{ duration: 0.5 }}
-            className="absolute inset-0 flex flex-col items-center justify-center z-10 py-16"
+            className="absolute inset-0 z-10"
           >
             <ShowLeaderboard
               entries={leaderboard}
@@ -929,46 +929,83 @@ export default function DisplayPage() {
         {/* ── FINAL REVEAL ────────────────────────────────────────────────────── */}
         {phase === 'final_reveal' && (
           <motion.div key="final-reveal" {...slide} transition={{ duration: 0.5 }}
-            className="absolute inset-0 flex flex-col items-center justify-center z-10 py-16"
+            className="absolute inset-0 z-10 flex flex-col"
+            style={{ padding: '3vh 8vw 2vh' }}
           >
+            {/* Heading */}
             <motion.h2
               initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, ease: 'backOut' }}
-              className="font-display text-6xl text-white text-center tracking-wide mb-10"
+              className="font-display text-white text-center tracking-wide shrink-0"
+              style={{
+                fontSize: `clamp(2rem, ${Math.min(7, Math.max(3, 56 / Math.max(finalEntries.length, 1)))}vw, 8rem)`,
+                lineHeight: 1, marginBottom: '2vh',
+              }}
             >
               FINAL RESULTS
             </motion.h2>
-            <div className="w-full max-w-3xl px-6 flex flex-col gap-4">
+
+            {/* Entries — fill remaining height */}
+            <div className="flex-1 flex flex-col justify-center">
               <AnimatePresence>
-                {finalEntries.slice(0, finalRevealIdx + 1).map((entry, i) => (
-                  <motion.div
-                    key={entry.team_id}
-                    initial={{ opacity: 0, x: -80, scale: 0.88 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ duration: 0.55, ease: 'backOut' }}
-                    className={`flex items-center justify-between px-6 py-5 rounded-xl border ${
-                      i === finalEntries.length - 1
-                        ? 'bg-mustard/20 border-mustard'
-                        : i === finalEntries.length - 2
-                        ? 'bg-white/10 border-white/20'
-                        : 'bg-white/5 border-white/10'
-                    }`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <span className={`font-display text-4xl ${
-                        i === finalEntries.length - 1 ? 'text-mustard' : 'text-white/40'
-                      }`}>
-                        {finalEntries.length - i}
+                {finalEntries.slice(0, finalRevealIdx + 1).map((entry, i) => {
+                  const n = finalEntries.length
+                  const rowVh = Math.min(13, Math.floor(80 / Math.max(n, 1)))
+                  const nameVw = Math.min(3.2, Math.max(1.2, 26 / Math.max(n, 1)))
+                  const rankVw = Math.min(4, Math.max(1.5, 30 / Math.max(n, 1)))
+                  const isWinner = i === n - 1
+                  const isSecond = i === n - 2
+
+                  return (
+                    <motion.div
+                      key={entry.team_id}
+                      initial={{ opacity: 0, x: -80, scale: 0.9 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      transition={{ duration: 0.55, ease: 'backOut' }}
+                      style={{
+                        display: 'flex', alignItems: 'center',
+                        justifyContent: 'space-between',
+                        height: `${rowVh}vh`,
+                        padding: '0 2vw',
+                        borderRadius: 12,
+                        marginBottom: '0.6vh',
+                        background: isWinner
+                          ? 'rgba(224,165,60,0.18)'
+                          : isSecond
+                          ? 'rgba(255,255,255,0.08)'
+                          : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${isWinner ? 'rgba(224,165,60,0.5)' : isSecond ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)'}`,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2vw', minWidth: 0 }}>
+                        <span style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: `clamp(1rem, ${rankVw}vw, 5rem)`,
+                          color: isWinner ? '#E0A53C' : 'rgba(255,255,255,0.3)',
+                          lineHeight: 1, flexShrink: 0,
+                        }}>
+                          {n - i}
+                        </span>
+                        <span style={{
+                          fontSize: `clamp(0.8rem, ${nameVw}vw, 4rem)`,
+                          fontWeight: 700, textTransform: 'uppercase',
+                          color: isWinner ? '#E0A53C' : 'white',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {entry.team_name}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: `clamp(0.7rem, ${Math.min(2, Math.max(0.9, 16 / Math.max(n, 1)))}vw, 2.5rem)`,
+                        fontWeight: 700, flexShrink: 0,
+                        color: isWinner ? '#E0A53C' : 'rgba(255,255,255,0.55)',
+                      }}>
+                        {entry.total_points} pts
                       </span>
-                      <span className={`text-2xl font-semibold uppercase ${
-                        i === finalEntries.length - 1 ? 'text-mustard' : 'text-white'
-                      }`}>{entry.team_name}</span>
-                    </div>
-                    <span className={`text-xl font-bold ${
-                      i === finalEntries.length - 1 ? 'text-mustard' : 'text-white/60'
-                    }`}>{entry.total_points} pts</span>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  )
+                })}
               </AnimatePresence>
             </div>
           </motion.div>
