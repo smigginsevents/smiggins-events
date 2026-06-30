@@ -645,15 +645,15 @@ export default function DisplayPage() {
                   })}
                 </div>
               ) : (
-                <motion.div
-                  initial={{ scale: 0.7, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.5, ease: 'backOut' }}
-                  className="bg-pine/30 border border-pine rounded-2xl px-12 py-8 inline-block mb-6"
+                <motion.p
+                  initial={{ opacity: 0, y: 24, scale: 0.92 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.45, ease: 'backOut' }}
+                  className="font-display uppercase tracking-wide mb-4"
+                  style={{ fontSize: 'clamp(3rem, 7vw, 10rem)', color: '#E0A53C', lineHeight: 1.1 }}
                 >
-                  <p className="text-xs font-semibold text-pine/60 uppercase tracking-widest mb-2">Answer</p>
-                  <p className="text-5xl font-bold text-white">{revealedAnswer ?? '…'}</p>
-                </motion.div>
+                  {revealedAnswer ?? '…'}
+                </motion.p>
               )}
 
               <MediaDisplay mediaType={question.media_type} mediaUrl={question.media_url} />
