@@ -319,7 +319,7 @@ export default function DisplayPage() {
         {phase === 'game_overview' && (
           <motion.div key="game-overview" {...slide} transition={{ duration: 0.6 }}
             className="absolute inset-0 flex flex-col z-10"
-            style={{ padding: '4vh 7vw' }}
+            style={{ padding: '2vh 7vw' }}
           >
             <SnowfallEffect />
             <div className="relative z-10 flex flex-col h-full">
@@ -327,64 +327,61 @@ export default function DisplayPage() {
               {/* Heading */}
               <motion.div
                 initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}
-                className="text-center" style={{ marginBottom: '2.5vh' }}
+                className="text-center" style={{ marginBottom: '1.5vh' }}
               >
-                <p className="text-white/35 uppercase tracking-[0.4em]" style={{ fontSize: 'clamp(0.55rem, 1vw, 1.1rem)', marginBottom: '0.8vh' }}>
+                <p className="text-white/35 uppercase tracking-[0.4em]" style={{ fontSize: 'clamp(0.5rem, 0.8vw, 1rem)', marginBottom: '0.5vh' }}>
                   Smiggins Hotel · 4 Pines Brewing
                 </p>
-                <h1 className="font-display text-white tracking-wide" style={{ fontSize: 'clamp(3rem, 7vw, 9rem)', lineHeight: 1 }}>
+                <h1 className="font-display text-white tracking-wide" style={{ fontSize: 'clamp(2rem, 4.5vw, 7rem)', lineHeight: 1 }}>
                   TONIGHT&apos;S LINEUP
                 </h1>
               </motion.div>
 
               {/* Top rule */}
-              <div className="bg-white/20" style={{ height: 2, marginBottom: '2vh' }} />
+              <div className="bg-white/20" style={{ height: 2, marginBottom: '1.2vh' }} />
 
-              {/* Rounds list — fills remaining space */}
-              <div className="flex-1 flex flex-col justify-center">
+              {/* Rounds list — flex-1 so it fills remaining height */}
+              <div className="flex-1 flex flex-col justify-center" style={{ gap: 0 }}>
                 {rounds.map((round, i) => (
                   <motion.div
                     key={round.id}
                     initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + i * 0.08, duration: 0.4 }}
+                    transition={{ delay: 0.2 + i * 0.07, duration: 0.35 }}
                     className="flex items-baseline border-b border-white/10 last:border-0"
-                    style={{ paddingTop: '1.4vh', paddingBottom: '1.4vh', gap: '2.5vw' }}
+                    style={{ paddingTop: '0.9vh', paddingBottom: '0.9vh', gap: '2vw' }}
                   >
-                    {/* Round number */}
                     <span
                       className="font-display shrink-0 text-right"
                       style={{
-                        fontSize: 'clamp(2rem, 3.8vw, 5.5rem)',
+                        fontSize: 'clamp(1.4rem, 2.5vw, 4rem)',
                         color: round.round_number === rounds.length ? '#E0A53C' : '#C8552D',
-                        minWidth: '2.2em', lineHeight: 1,
+                        minWidth: '2em', lineHeight: 1,
                       }}
                     >
                       {round.round_number}
                     </span>
 
-                    {/* Name + description */}
-                    <div className="flex-1 flex flex-col justify-center">
+                    <div className="flex-1">
                       <span
                         className="font-display text-white uppercase tracking-wide"
-                        style={{ fontSize: 'clamp(1.6rem, 3.5vw, 5rem)', lineHeight: 1 }}
+                        style={{ fontSize: 'clamp(1.2rem, 2.3vw, 3.8rem)', lineHeight: 1 }}
                       >
                         {round.name}
                       </span>
                       {round.description && (
-                        <span
+                        <p
                           className="text-white/45 italic"
-                          style={{ fontSize: 'clamp(0.75rem, 1.3vw, 1.8rem)', marginTop: '0.3em', fontFamily: 'var(--font-body)' }}
+                          style={{ fontSize: 'clamp(0.6rem, 0.95vw, 1.5rem)', marginTop: '0.25em', fontFamily: 'var(--font-body)' }}
                         >
                           {round.description}
-                        </span>
+                        </p>
                       )}
                     </div>
 
-                    {/* Double points badge */}
                     {round.round_number === rounds.length && (
                       <span
                         className="font-display text-mustard shrink-0"
-                        style={{ fontSize: 'clamp(0.9rem, 1.5vw, 2rem)', letterSpacing: '0.08em' }}
+                        style={{ fontSize: 'clamp(0.7rem, 1.1vw, 1.6rem)', letterSpacing: '0.08em' }}
                       >
                         ⚡ ×2 PTS
                       </span>
@@ -394,13 +391,13 @@ export default function DisplayPage() {
               </div>
 
               {/* Bottom rule */}
-              <div className="bg-white/20" style={{ height: 2, marginTop: '2vh', marginBottom: '2vh' }} />
+              <div className="bg-white/20" style={{ height: 2, marginTop: '1.2vh', marginBottom: '1vh' }} />
 
               {/* Rules */}
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}
                 className="flex items-center justify-center text-white/50 uppercase tracking-widest"
-                style={{ gap: '3vw', fontSize: 'clamp(0.6rem, 1.1vw, 1.4rem)' }}
+                style={{ gap: '2.5vw', fontSize: 'clamp(0.5rem, 0.9vw, 1.2rem)', paddingBottom: '1vh' }}
               >
                 <span>⏱ 30 seconds per question</span>
                 <span className="text-white/20">·</span>
