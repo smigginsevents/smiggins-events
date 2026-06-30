@@ -1493,7 +1493,7 @@ export function BracketView({ tournament, initialMatches, initialSilverWinner, s
             exit={{ opacity: 0, y: 30 }}
             transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             style={{
-              position: 'fixed', bottom: silverMedalist || !showSilverPlayoff ? 90 : 22,
+              position: 'fixed', bottom: champion ? 100 : 22,
               left: '50%', transform: 'translateX(-50%)',
               zIndex: 38, width: 'min(420px, 92vw)',
               background: 'rgba(4,10,30,0.94)',
