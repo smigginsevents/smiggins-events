@@ -416,7 +416,7 @@ export default function HomePage() {
               className="mt-auto px-6 pb-6 text-center"
             >
               <div className="h-px bg-white/10 mb-4" />
-              <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>Starts 8:30pm</p>
+              <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>Starts 9:00pm</p>
               <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>in the Smiggins Hotel bar</p>
               <Link href="/trivia" className="hover:text-white/70 transition-colors" style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: 10, display: 'inline-block' }}>Leaderboard →</Link>
             </motion.div>

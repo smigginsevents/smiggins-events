@@ -188,28 +188,11 @@ export default function TriviaTeamsPage() {
             style={{ height: 'clamp(80px, 9vw, 116px)', objectFit: 'contain', opacity: 0.9, marginBottom: 'clamp(14px, 1.8vw, 24px)' }}
           />
 
-          {/* TUESDAY */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.15 }}
-            style={{
-              fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(2.2rem, 4vw, 4.8rem)',
-              color: 'rgba(255,255,255,0.5)',
-              letterSpacing: '0.38em',
-              lineHeight: 1,
-              textTransform: 'uppercase',
-            }}
-          >
-            TUESDAY
-          </motion.div>
-
           {/* TRIVIA — the big hero word */}
           <motion.div
             initial={{ opacity: 0, scale: 0.88 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.65, delay: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
+            transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 0.61, 0.36, 1] }}
             style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
               fontSize: 'clamp(7rem, 13vw, 15rem)',
@@ -222,22 +205,22 @@ export default function TriviaTeamsPage() {
             TRIVIA
           </motion.div>
 
-          {/* NIGHT */}
+          {/* TUESDAY — smaller, rust/orange */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.38 }}
+            transition={{ duration: 0.55, delay: 0.28 }}
             style={{
               fontFamily: 'var(--font-jost)', fontWeight: 900,
-              fontSize: 'clamp(3.8rem, 6.6vw, 7.8rem)',
-              color: 'rgba(200,85,45,0.9)',
-              letterSpacing: '0.32em',
+              fontSize: 'clamp(2.4rem, 4.5vw, 5.8rem)',
+              color: '#C8552D',
+              letterSpacing: '0.28em',
               lineHeight: 1,
-              marginTop: '-4px',
+              marginTop: '0.1em',
               textShadow: '0 4px 32px rgba(0,0,0,0.5)',
             }}
           >
-            NIGHT
+            TUESDAY
           </motion.div>
         </motion.div>
 
@@ -270,7 +253,7 @@ export default function TriviaTeamsPage() {
             letterSpacing: '0.32em', marginTop: 12,
           }}
         >
-          {dayLabel} · 8:30PM
+          {dayLabel} · 9:00PM
         </motion.div>
 
         {/* Bottom line */}

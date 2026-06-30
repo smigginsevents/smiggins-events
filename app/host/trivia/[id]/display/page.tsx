@@ -270,24 +270,23 @@ export default function DisplayPage() {
             <SnowfallEffect />
 
             {/* Left: Branding */}
-            <div className="relative z-10 w-1/2 flex flex-col items-center justify-center gap-6 px-12 border-r border-white/5">
-              <img src="/smigginslogo-white.png" alt="Smiggins Hotel" className="w-32 h-32 object-contain opacity-90" />
-              <div className="text-center">
-                <p className="text-timber tracking-widest uppercase text-sm mb-3">Every Tuesday 8:30pm</p>
-                <h1 className="font-display text-8xl tracking-wide leading-none text-white">TUESDAY</h1>
-                <h2 className="font-display text-8xl tracking-wide leading-none text-rust">TRIVIA</h2>
-                <h3 className="font-display text-8xl tracking-wide leading-none text-white/60">NIGHT</h3>
-                <p className="font-dancing text-2xl text-white/50 mt-4">Hosted by Freddy Holler</p>
+            <div className="relative z-10 w-1/2 flex flex-col items-center justify-center gap-4 px-12 border-r border-white/10">
+              <img src="/smigginslogo-white.png" alt="Smiggins Hotel" className="object-contain opacity-90" style={{ height: 'clamp(70px, 8vw, 110px)' }} />
+              <div className="text-center leading-none">
+                <h1 className="font-display text-white tracking-wide" style={{ fontSize: 'clamp(5rem, 10vw, 13rem)', lineHeight: 0.9 }}>TRIVIA</h1>
+                <h2 className="font-display tracking-widest" style={{ fontSize: 'clamp(2.2rem, 4.2vw, 5.5rem)', color: '#C8552D', lineHeight: 1, marginTop: '0.1em' }}>TUESDAY</h2>
               </div>
+              <p className="font-dancing text-white/60" style={{ fontSize: 'clamp(1.4rem, 2.2vw, 2.6rem)', marginTop: '0.5em' }}>Hosted by Freddy Holler</p>
+              <p className="text-white/30 tracking-[0.3em] uppercase" style={{ fontSize: 'clamp(0.6rem, 0.9vw, 1rem)', marginTop: '0.3em' }}>TUESDAY · 9:00PM</p>
             </div>
 
             {/* Right: Team list */}
-            <div className="relative z-10 w-1/2 flex flex-col justify-center px-12 gap-6">
-              <h2 className="font-display text-3xl tracking-wide text-white/60">TONIGHT&apos;S TEAMS</h2>
+            <div className="relative z-10 w-1/2 flex flex-col justify-center px-12 gap-5">
+              <h2 className="font-display tracking-wide text-white/50" style={{ fontSize: 'clamp(1.4rem, 2.5vw, 3rem)' }}>TONIGHT&apos;S TEAMS</h2>
               {teams.length === 0 ? (
-                <p className="text-white/30 text-xl">Waiting for teams to register…</p>
+                <p className="text-white/30" style={{ fontSize: 'clamp(1rem, 1.6vw, 2rem)' }}>Waiting for teams to register…</p>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col">
                   <AnimatePresence>
                     {teams.map((team, i) => (
                       <motion.div
@@ -296,21 +295,20 @@ export default function DisplayPage() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -40 }}
                         transition={{ duration: 0.4, delay: i * 0.05 }}
-                        className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-xl px-5 py-3"
+                        className="flex items-center gap-4 border-b border-white/10 py-3"
                       >
-                        <span className="text-white/30 font-display text-xl w-6">{i + 1}</span>
-                        <span className="font-semibold text-xl uppercase tracking-wide">{team.name}</span>
+                        <span className="text-white/25 font-display shrink-0 text-right" style={{ fontSize: 'clamp(1rem, 1.8vw, 2.2rem)', minWidth: '2em' }}>{i + 1}</span>
+                        <span className="font-display uppercase tracking-wide text-white" style={{ fontSize: 'clamp(1.2rem, 2.2vw, 2.8rem)' }}>{team.name}</span>
                       </motion.div>
                     ))}
                   </AnimatePresence>
                 </div>
               )}
               {teams.length >= 2 && (
-                <motion.p
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-                  className="text-white/30 text-sm mt-2"
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+                  className="text-white/25 tracking-widest uppercase" style={{ fontSize: 'clamp(0.6rem, 0.85vw, 1rem)', marginTop: '0.5em' }}
                 >
-                  {teams.length} team{teams.length !== 1 ? 's' : ''} ready · Waiting for host to start…
+                  {teams.length} teams ready · Waiting for host to start…
                 </motion.p>
               )}
             </div>
@@ -320,54 +318,95 @@ export default function DisplayPage() {
         {/* ── GAME OVERVIEW ──────────────────────────────────────────────────── */}
         {phase === 'game_overview' && (
           <motion.div key="game-overview" {...slide} transition={{ duration: 0.6 }}
-            className="absolute inset-0 flex flex-col items-center justify-center z-10 px-16 py-12"
+            className="absolute inset-0 flex flex-col z-10"
+            style={{ padding: '4vh 7vw' }}
           >
             <SnowfallEffect />
-            <div className="relative z-10 w-full max-w-4xl">
-              <motion.p
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                className="text-timber tracking-widest uppercase text-center text-sm mb-2"
-              >
-                Smiggins Hotel — 4 Pines Trivia Night
-              </motion.p>
-              <motion.h1
-                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, ease: 'backOut' }}
-                className="font-display text-6xl text-white text-center tracking-wide mb-10"
-              >
-                TONIGHT&apos;S LINEUP
-              </motion.h1>
+            <div className="relative z-10 flex flex-col h-full">
 
-              <div className="grid grid-cols-2 gap-3 mb-10">
+              {/* Heading */}
+              <motion.div
+                initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}
+                className="text-center" style={{ marginBottom: '2.5vh' }}
+              >
+                <p className="text-white/35 uppercase tracking-[0.4em]" style={{ fontSize: 'clamp(0.55rem, 1vw, 1.1rem)', marginBottom: '0.8vh' }}>
+                  Smiggins Hotel · 4 Pines Brewing
+                </p>
+                <h1 className="font-display text-white tracking-wide" style={{ fontSize: 'clamp(3rem, 7vw, 9rem)', lineHeight: 1 }}>
+                  TONIGHT&apos;S LINEUP
+                </h1>
+              </motion.div>
+
+              {/* Top rule */}
+              <div className="bg-white/20" style={{ height: 2, marginBottom: '2vh' }} />
+
+              {/* Rounds list — fills remaining space */}
+              <div className="flex-1 flex flex-col justify-center">
                 {rounds.map((round, i) => (
                   <motion.div
                     key={round.id}
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 + i * 0.1, duration: 0.4 }}
-                    className="flex items-start gap-4 bg-white/5 border border-white/10 rounded-xl px-5 py-4"
+                    initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 + i * 0.08, duration: 0.4 }}
+                    className="flex items-baseline border-b border-white/10 last:border-0"
+                    style={{ paddingTop: '1.4vh', paddingBottom: '1.4vh', gap: '2.5vw' }}
                   >
-                    <span className={`font-display text-3xl w-8 shrink-0 ${round.round_number === rounds.length ? 'text-mustard' : 'text-rust'}`}>
+                    {/* Round number */}
+                    <span
+                      className="font-display shrink-0 text-right"
+                      style={{
+                        fontSize: 'clamp(2rem, 3.8vw, 5.5rem)',
+                        color: round.round_number === rounds.length ? '#E0A53C' : '#C8552D',
+                        minWidth: '2.2em', lineHeight: 1,
+                      }}
+                    >
                       {round.round_number}
                     </span>
-                    <div>
-                      <p className="font-semibold text-white text-sm uppercase tracking-wide">{round.name}</p>
-                      {round.description && <p className="text-white/40 text-xs mt-1 italic">{round.description}</p>}
+
+                    {/* Name + description */}
+                    <div className="flex-1 flex flex-col justify-center">
+                      <span
+                        className="font-display text-white uppercase tracking-wide"
+                        style={{ fontSize: 'clamp(1.6rem, 3.5vw, 5rem)', lineHeight: 1 }}
+                      >
+                        {round.name}
+                      </span>
+                      {round.description && (
+                        <span
+                          className="text-white/45 italic"
+                          style={{ fontSize: 'clamp(0.75rem, 1.3vw, 1.8rem)', marginTop: '0.3em', fontFamily: 'var(--font-body)' }}
+                        >
+                          {round.description}
+                        </span>
+                      )}
                     </div>
+
+                    {/* Double points badge */}
                     {round.round_number === rounds.length && (
-                      <span className="ml-auto text-mustard text-xs font-semibold whitespace-nowrap">×2 pts</span>
+                      <span
+                        className="font-display text-mustard shrink-0"
+                        style={{ fontSize: 'clamp(0.9rem, 1.5vw, 2rem)', letterSpacing: '0.08em' }}
+                      >
+                        ⚡ ×2 PTS
+                      </span>
                     )}
                   </motion.div>
                 ))}
               </div>
 
+              {/* Bottom rule */}
+              <div className="bg-white/20" style={{ height: 2, marginTop: '2vh', marginBottom: '2vh' }} />
+
+              {/* Rules */}
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}
-                className="flex items-center justify-center gap-6 text-white/40 text-sm"
+                className="flex items-center justify-center text-white/50 uppercase tracking-widest"
+                style={{ gap: '3vw', fontSize: 'clamp(0.6rem, 1.1vw, 1.4rem)' }}
               >
                 <span>⏱ 30 seconds per question</span>
-                <span className="w-1 h-1 rounded-full bg-white/20" />
+                <span className="text-white/20">·</span>
                 <span>✎ Swap sheets every 2 rounds</span>
-                <span className="w-1 h-1 rounded-full bg-white/20" />
-                <span className="text-mustard">★ Double points in the final round</span>
+                <span className="text-white/20">·</span>
+                <span style={{ color: '#E0A53C' }}>★ Double points — final round</span>
               </motion.div>
             </div>
           </motion.div>
