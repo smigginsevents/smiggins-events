@@ -553,10 +553,8 @@ export default function DisplayPage() {
               style={{ objectFit: 'contain', background: '#0a0a1a' }}
             />
 
-            {/* Top bar — round + Q indicator */}
-            <div className="absolute top-6 left-0 right-0 px-10 flex items-center justify-between z-20"
-              style={{ background: 'linear-gradient(to bottom, rgba(22,45,90,0.7) 0%, transparent 100%)', paddingBottom: 32 }}
-            >
+            {/* Top bar — round + Q indicator, no gradient */}
+            <div className="absolute top-6 left-0 right-0 px-10 flex items-center justify-between z-20">
               <div className="flex items-center gap-3">
                 {currentRound && (
                   <span className="bg-rust text-white font-display text-lg px-4 py-1.5 rounded-full">
@@ -604,6 +602,24 @@ export default function DisplayPage() {
                 </span>
               )}
             </div>
+
+            {/* Audio visual indicator */}
+            {question.media_type === 'audio' && question.media_url && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, ease: 'backOut' }}
+                className="flex flex-col items-center"
+              >
+                <motion.div
+                  animate={{ scale: [1, 1.06, 1], opacity: [0.7, 1, 0.7] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+                  style={{ fontSize: 'clamp(5rem, 12vw, 14rem)', lineHeight: 1 }}
+                >
+                  🎵
+                </motion.div>
+              </motion.div>
+            )}
 
             {/* Question text */}
             <div className="text-center w-full max-w-4xl">

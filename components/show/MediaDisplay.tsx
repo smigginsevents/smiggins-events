@@ -47,11 +47,8 @@ export function MediaDisplay({ mediaType, mediaUrl }: Props) {
   }
 
   if (mediaType === 'audio') {
-    return (
-      <div className="flex justify-center">
-        <audio controls autoPlay src={mediaUrl} className="rounded-lg" />
-      </div>
-    )
+    // Play the audio silently — visual indicator is handled by the parent display screen
+    return <audio autoPlay src={mediaUrl} className="hidden" />
   }
 
   return null
