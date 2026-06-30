@@ -15,6 +15,73 @@ import type {
   TriviaLiveState, TriviaEvent, TriviaRound, TriviaQuestionPublic, Team, LeaderboardEntry,
 } from '@/lib/types'
 
+// ─── Scramble text reveal ─────────────────────────────────────────────────────
+const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?!@#$%&*'
+
+function ScrambleText({ text }: { text: string }) {
+  const upper = text.toUpperCase()
+  const [chars, setChars] = useState<Array<{ ch: string; locked: boolean }>>(() =>
+    upper.split('').map(l => ({
+      ch: l === ' ' ? ' ' : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)],
+      locked: l === ' ',
+    }))
+  )
+
+  useEffect(() => {
+    const letters = upper.split('')
+    const perLetterMs = Math.min(110, Math.max(40, Math.floor(1600 / Math.max(letters.length, 1))))
+
+    setChars(letters.map(l => ({
+      ch: l === ' ' ? ' ' : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)],
+      locked: l === ' ',
+    })))
+
+    const scrambleId = setInterval(() => {
+      setChars(prev => prev.map(item =>
+        item.locked ? item : { ch: SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)], locked: false }
+      ))
+    }, 55)
+
+    const lockTimers = letters.map((letter, i) =>
+      setTimeout(() => {
+        setChars(prev => {
+          const next = [...prev]
+          next[i] = { ch: letter === ' ' ? ' ' : letter, locked: true }
+          return next
+        })
+      }, 350 + i * perLetterMs)
+    )
+
+    const stopId = setTimeout(() => clearInterval(scrambleId), 350 + letters.length * perLetterMs + 150)
+
+    return () => {
+      clearInterval(scrambleId)
+      lockTimers.forEach(clearTimeout)
+      clearTimeout(stopId)
+    }
+  }, [upper])
+
+  return (
+    <>
+      {chars.map((item, i) => (
+        <span
+          key={i}
+          style={{
+            color: item.locked ? '#ffffff' : 'rgba(255,255,255,0.22)',
+            transition: item.locked ? 'color 0.08s' : 'none',
+            display: item.ch === ' ' ? 'inline' : 'inline-block',
+            minWidth: item.ch === ' ' ? '0.35em' : undefined,
+            fontFamily: 'var(--font-jost)',
+            fontWeight: 900,
+          }}
+        >
+          {item.ch}
+        </span>
+      ))}
+    </>
+  )
+}
+
 // ─── Transition presets ────────────────────────────────────────────────────────
 const slide = {
   initial: { opacity: 0, y: 50, scale: 0.96 },
@@ -56,6 +123,8 @@ export default function DisplayPage() {
 
   const prevPhaseRef = useRef<string | null>(null)
   const prevMarkingIdxRef = useRef<number>(-1)
+  // Ref so the reactive fetch effect always sees the latest questions without stale closure
+  const markingQuestionsRef = useRef<TriviaQuestionPublic[]>([])
 
   const computeLeaderboard = useCallback(async () => {
     const supabase = createClient()
@@ -136,31 +205,12 @@ export default function DisplayPage() {
       playSound('reveal')
     }
 
-    // Marking — load questions if entering the phase
-    if (state.phase === 'marking' && state.current_round_id) {
+    // Marking — load questions when entering the phase (answer fetch handled by useEffect below)
+    if (state.phase === 'marking' && state.current_round_id && markingQuestionsRef.current.length === 0) {
       const rds = currentRounds ?? rounds
       const qs = await loadMarkingQuestions(state.current_round_id, rds)
       setMarkingQuestions(qs)
-      setMarkingAnswer(null)
-    }
-
-    // Marking answer reveal — fetch when index changes + revealed
-    if (state.phase === 'marking') {
-      const rds = currentRounds ?? rounds
-      const qs = markingQuestions.length > 0 ? markingQuestions : await loadMarkingQuestions(state.current_round_id!, rds)
-      if (markingQuestions.length === 0) setMarkingQuestions(qs)
-      const mq = qs[state.marking_question_index ?? 0]
-      if (state.marking_revealed && mq) {
-        if (prevMarkingIdxRef.current !== state.marking_question_index) {
-          setMarkingAnswer(null)
-        }
-        const ans = await fetchAnswer(mq.id)
-        setMarkingAnswer(ans)
-        playSound('reveal')
-      } else {
-        setMarkingAnswer(null)
-      }
-      prevMarkingIdxRef.current = state.marking_question_index ?? 0
+      markingQuestionsRef.current = qs
     }
 
     // Break leaderboard
@@ -241,6 +291,31 @@ export default function DisplayPage() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [eventId, loadTeams])
+
+  // Keep markingQuestionsRef in sync so the fetch effect below never has a stale closure
+  useEffect(() => {
+    markingQuestionsRef.current = markingQuestions
+  }, [markingQuestions])
+
+  // Reactively fetch the marking answer whenever revealed state changes.
+  // Runs independently of handleStateChange to avoid stale-closure race conditions.
+  useEffect(() => {
+    if (liveState?.phase !== 'marking' || !liveState.marking_revealed) {
+      setMarkingAnswer(null)
+      return
+    }
+    const idx = liveState.marking_question_index ?? 0
+    const mq = markingQuestionsRef.current[idx]
+    if (!mq) return
+    let cancelled = false
+    fetchAnswer(mq.id).then(ans => {
+      if (!cancelled && ans) {
+        setMarkingAnswer(ans)
+        playSound('reveal')
+      }
+    })
+    return () => { cancelled = true }
+  }, [liveState?.phase, liveState?.marking_revealed, liveState?.marking_question_index, fetchAnswer])
 
   const currentRound = rounds.find(r => r.id === liveState?.current_round_id)
   const timerDuration = currentRound?.time_limit_seconds ?? event?.default_time_limit_seconds ?? 30
@@ -667,18 +742,38 @@ export default function DisplayPage() {
                   </div>
                 )}
 
-                {/* Answer reveal */}
+                {/* Answer reveal — springs in, then text scrambles into the answer */}
                 <AnimatePresence>
-                  {liveState?.marking_revealed && markingAnswer && (
+                  {liveState?.marking_revealed && (
                     <motion.div
-                      initial={{ scale: 0.7, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.5, ease: 'backOut' }}
-                      className="bg-pine/30 border border-pine rounded-2xl px-12 py-8 inline-block"
+                      initial={{ y: 70, opacity: 0, scale: 0.88 }}
+                      animate={{ y: 0, opacity: 1, scale: 1 }}
+                      exit={{ y: -30, opacity: 0, scale: 0.95 }}
+                      transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+                      className="w-full max-w-4xl mx-auto"
+                      style={{ marginTop: '1vh' }}
                     >
-                      <p className="text-xs font-semibold text-pine/60 uppercase tracking-widest mb-2">Correct Answer</p>
-                      <p className="text-4xl font-bold text-white">{markingAnswer}</p>
+                      <div style={{
+                        background: 'rgba(23,64,47,0.45)',
+                        border: '2px solid rgba(35,100,60,0.7)',
+                        borderRadius: 20,
+                        padding: '2.5vh 4vw',
+                        textAlign: 'center',
+                        boxShadow: '0 0 80px rgba(35,100,60,0.35), inset 0 0 40px rgba(35,100,60,0.1)',
+                      }}>
+                        <motion.p
+                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
+                          style={{ color: 'rgba(100,200,120,0.6)', fontSize: 'clamp(0.55rem, 0.9vw, 1.1rem)', letterSpacing: '0.35em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '1vh' }}
+                        >
+                          Correct Answer
+                        </motion.p>
+                        <div style={{ fontSize: 'clamp(1.8rem, 4vw, 6rem)', lineHeight: 1.1, minHeight: '1.2em' }}>
+                          {markingAnswer
+                            ? <ScrambleText text={markingAnswer} />
+                            : <span style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'var(--font-jost)', fontWeight: 900 }}>···</span>
+                          }
+                        </div>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>

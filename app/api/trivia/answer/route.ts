@@ -32,18 +32,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 })
   }
 
-  // Verify the event's live state is in answer_reveal phase
   const { data: liveState } = await supabase
     .from('trivia_live_state')
-    .select('phase, current_question_id')
+    .select('phase, current_question_id, marking_revealed')
     .eq('event_id', eventId)
     .single()
 
-  if (
-    !liveState ||
-    liveState.phase !== 'answer_reveal' ||
-    liveState.current_question_id !== questionId
-  ) {
+  if (!liveState) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+  }
+
+  // Allow answer during normal answer_reveal OR during marking when host has revealed
+  const isAnswerReveal = liveState.phase === 'answer_reveal' && liveState.current_question_id === questionId
+  const isMarkingReveal = liveState.phase === 'marking' && liveState.marking_revealed === true
+
+  if (!isAnswerReveal && !isMarkingReveal) {
     return NextResponse.json({ error: 'Answer not yet revealed' }, { status: 403 })
   }
 
