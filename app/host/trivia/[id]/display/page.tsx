@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { createClient } from '@/lib/supabase/client'
 import { useLiveState } from '@/lib/realtime'
-import { playSound, stopSound } from '@/lib/sounds'
+import { playSound } from '@/lib/sounds'
 import { SnowfallEffect } from '@/components/show/SnowfallEffect'
 import { TimerBar } from '@/components/show/TimerBar'
 import { MediaDisplay } from '@/components/show/MediaDisplay'
@@ -248,9 +248,7 @@ export default function DisplayPage() {
       }, 1500)
     }
 
-    // Timer sounds
-    if (state.phase === 'timer_running') playSound('tick')
-    if (prevPhase === 'timer_running' && state.phase !== 'timer_running') stopSound('tick')
+    // Countdown beeps + buzzer are handled inside TimerBar via Web Audio synthesis
   }, [computeLeaderboard, fetchAnswer, loadMarkingQuestions, markingQuestions, rounds])
 
   useEffect(() => {

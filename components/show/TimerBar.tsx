@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { playCountdownBeep, playBuzzer } from '@/lib/sounds'
 
 interface Props {
   timerStartedAt: string | null
@@ -17,9 +18,12 @@ export function TimerBar({ timerStartedAt, durationSeconds, onZero }: Props) {
   const onZeroRef = useRef(onZero)
   onZeroRef.current = onZero
   const firedRef = useRef(false)
+  const lastBeepRef = useRef(-1) // last whole-second at which a beep fired
 
   useEffect(() => {
     firedRef.current = false
+    lastBeepRef.current = -1
+
     if (!timerStartedAt) {
       setRemaining(durationSeconds)
       return
@@ -29,8 +33,19 @@ export function TimerBar({ timerStartedAt, durationSeconds, onZero }: Props) {
       const elapsed = (Date.now() - new Date(timerStartedAt!).getTime()) / 1000
       const rem = Math.max(durationSeconds - elapsed, 0)
       setRemaining(rem)
+
+      const secs = Math.ceil(rem)
+
+      // Countdown beeps — fire once per whole second for last 10 seconds
+      if (rem > 0 && secs <= 10 && secs !== lastBeepRef.current) {
+        lastBeepRef.current = secs
+        playCountdownBeep(secs)
+      }
+
+      // Buzzer + onZero at the end
       if (rem <= 0 && !firedRef.current) {
         firedRef.current = true
+        playBuzzer()
         onZeroRef.current?.()
       }
     }
@@ -55,33 +70,21 @@ export function TimerBar({ timerStartedAt, durationSeconds, onZero }: Props) {
     <div className="flex flex-col items-center gap-6">
       {/* Circular countdown ring */}
       <div className="relative" style={{ width: 200, height: 200 }}>
-        {/* Background track */}
         <svg
           width="200" height="200"
-          className="absolute inset-0 -rotate-90"
+          className="absolute inset-0"
           style={{ transform: 'rotate(-90deg)' }}
         >
-          <circle
-            cx="100" cy="100" r={RADIUS}
-            fill="none"
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth="10"
-          />
+          <circle cx="100" cy="100" r={RADIUS} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
           <motion.circle
             cx="100" cy="100" r={RADIUS}
-            fill="none"
-            strokeWidth="10"
-            strokeLinecap="round"
+            fill="none" strokeWidth="10" strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
-            animate={{
-              strokeDashoffset: offset,
-              stroke: ringColor,
-            }}
+            animate={{ strokeDashoffset: offset, stroke: ringColor }}
             transition={{ duration: 0.08, ease: 'linear' }}
           />
         </svg>
 
-        {/* Center number */}
         <div className="absolute inset-0 flex items-center justify-center">
           <AnimatePresence mode="popLayout">
             {isDone ? (
@@ -122,10 +125,7 @@ export function TimerBar({ timerStartedAt, durationSeconds, onZero }: Props) {
         <div className="h-2 rounded-full bg-white/10 overflow-hidden">
           <motion.div
             className="h-full rounded-full"
-            animate={{
-              width: `${pct * 100}%`,
-              backgroundColor: ringColor,
-            }}
+            animate={{ width: `${pct * 100}%`, backgroundColor: ringColor }}
             transition={{ duration: 0.08, ease: 'linear' }}
           />
         </div>
