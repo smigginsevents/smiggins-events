@@ -106,6 +106,7 @@ export interface PoolTournament {
   name: string
   event_date: string
   status: 'setup' | 'active' | 'complete'
+  silver_winner_id: string | null
   created_at: string
 }
 
@@ -127,6 +128,7 @@ export interface PoolMatch {
   player1_id: string | null
   player2_id: string | null
   is_bye: boolean
+  is_silver_match: boolean
   winner_id: string | null
   status: MatchStatus
   created_at: string

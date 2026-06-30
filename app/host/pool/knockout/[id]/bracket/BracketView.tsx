@@ -4,17 +4,30 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import {
+  getBracketMatches,
+  getSilverMatch,
+  resolveMedals,
+} from '@/lib/pool-medals'
 
 // ─── Helper: normalise raw DB row → Match ─────────────────────────────────────
 function normalizeMatch(m: any): Match {
   return {
     id: m.id, roundNumber: m.round_number, matchNumber: m.match_number,
-    tableNumber: m.table_number, isBye: m.is_bye, status: m.status,
+    tableNumber: m.table_number, isBye: m.is_bye, isSilverMatch: m.is_silver_match ?? false,
+    status: m.status,
     player1: m.player1 ? { id: m.player1.id, name: m.player1.name } : null,
     player2: m.player2 ? { id: m.player2.id, name: m.player2.name } : null,
     winner:  m.winner  ? { id: m.winner.id,  name: m.winner.name  } : null,
   }
 }
+
+const MATCH_SELECT = `
+  id, round_number, match_number, table_number, is_bye, is_silver_match, status, winner_id,
+  player1:pool_players!pool_matches_player1_id_fkey(id, name),
+  player2:pool_players!pool_matches_player2_id_fkey(id, name),
+  winner:pool_players!pool_matches_winner_id_fkey(id, name)
+`
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const CARD_H    = 50    // player card height (px)
@@ -43,12 +56,19 @@ interface Match {
   matchNumber: number
   tableNumber: number
   isBye: boolean
+  isSilverMatch: boolean
   status: string
   player1: Player | null
   player2: Player | null
   winner: Player | null
 }
-interface Tournament { id: string; name: string; eventDate: string; status: string }
+interface Tournament {
+  id: string
+  name: string
+  eventDate: string
+  status: string
+  silverWinnerId: string | null
+}
 interface LayoutMatch extends Match {
   indexInRound: number
   centerY: number
@@ -63,6 +83,7 @@ interface LayoutMatch extends Match {
 interface Props {
   tournament: Tournament
   initialMatches: Match[]
+  initialSilverWinner: Player | null
   showReveal: boolean
 }
 
@@ -71,8 +92,9 @@ interface Props {
 // Single-sided is used otherwise.
 
 function buildLayout(matches: Match[]) {
+  const bracketMatches = matches.filter(m => !m.isSilverMatch)
   const byRound: Record<number, Match[]> = {}
-  for (const m of matches) {
+  for (const m of bracketMatches) {
     if (!byRound[m.roundNumber]) byRound[m.roundNumber] = []
     byRound[m.roundNumber].push(m)
   }
@@ -634,10 +656,12 @@ function BracketMatchCard({
 }
 
 // ─── Main BracketView ─────────────────────────────────────────────────────────
-export function BracketView({ tournament, initialMatches, showReveal }: Props) {
+export function BracketView({ tournament, initialMatches, initialSilverWinner, showReveal }: Props) {
   type Phase = 'intro' | 'revealing' | 'lines' | 'bracket'
 
   const [matches, setMatches]        = useState<Match[]>(initialMatches)
+  const [storedSilverWinner, setStoredSilverWinner] = useState<Player | null>(initialSilverWinner)
+  const [silverCreating, setSilverCreating] = useState(false)
   const [phase, setPhase]            = useState<Phase>(showReveal ? 'intro' : 'bracket')
   const [revealedCount, setRevealed] = useState(showReveal ? 0 : 9999)
   const [svgKey, setSvgKey]          = useState(0)
@@ -673,14 +697,16 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
     if (showLatePanel) setTimeout(() => lateInputRef.current?.focus(), 180)
   }, [showLatePanel])
 
-  // ── Champion ───────────────────────────────────────────────────────────────
-  const champion = useMemo<Player | null>(() => {
-    if (matches.length === 0) return null
-    const maxRound  = Math.max(...matches.map(m => m.roundNumber))
-    const lastRound = matches.filter(m => m.roundNumber === maxRound)
-    if (lastRound.length !== 1) return null
-    return lastRound[0].winner ?? null
-  }, [matches])
+  // ── Medals ───────────────────────────────────────────────────────────────────
+  const medals = useMemo(
+    () => resolveMedals(matches, storedSilverWinner),
+    [matches, storedSilverWinner],
+  )
+  const champion = medals.gold
+  const silverMedalist = medals.silver
+  const silverMatch = useMemo(() => getSilverMatch(matches), [matches])
+  const showSilverPlayoff = medals.needsPlayoff && !silverMatch
+  const silverPlayoffPending = silverMatch && silverMatch.status !== 'complete'
 
   // ── Reveal timer ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -761,12 +787,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
         //    causing incorrect "tournament complete" when winners.length === 1)
         const { data: freshRound, error: fe } = await supabase
           .from('pool_matches')
-          .select(`
-            id, round_number, match_number, table_number, is_bye, status, winner_id,
-            player1:pool_players!pool_matches_player1_id_fkey(id, name),
-            player2:pool_players!pool_matches_player2_id_fkey(id, name),
-            winner:pool_players!pool_matches_winner_id_fkey(id, name)
-          `)
+          .select(MATCH_SELECT)
           .eq('tournament_id', tournament.id)
           .eq('round_number', match.roundNumber)
         if (fe) throw new Error(fe.message)
@@ -793,11 +814,19 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
         if (winners.length === 0) return
 
         if (winners.length === 1) {
-          // Grand final just finished — mark tournament complete
+          const merged = optimistic.map(m => {
+            const fresh = roundMs.find(r => r.id === m.id)
+            return fresh ?? m
+          })
+          const medalState = resolveMedals(merged, storedSilverWinner)
           await supabase
             .from('pool_tournaments')
-            .update({ status: 'complete' })
+            .update({
+              status: 'complete',
+              silver_winner_id: medalState.silver?.id ?? null,
+            })
             .eq('id', tournament.id)
+          if (medalState.silver) setStoredSilverWinner(medalState.silver)
         } else {
           // Multiple winners advance — spawn the next round
           await spawnNextRound(supabase, match.roundNumber, optimistic, winners)
@@ -810,8 +839,68 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selecting, matches, tournament.id],
+    [selecting, matches, tournament.id, storedSilverWinner],
   )
+
+  // ── Silver medal playoff ───────────────────────────────────────────────────
+  async function handleCreateSilverMatch() {
+    if (!medals.playoffPlayers || silverCreating || silverMatch) return
+    setSilverCreating(true)
+    try {
+      const supabase = createClient()
+      const bracket = getBracketMatches(matches)
+      const maxRound = Math.max(...bracket.map(m => m.roundNumber))
+      const maxMatch = Math.max(...matches.map(m => m.matchNumber))
+      const [p1, p2] = medals.playoffPlayers
+
+      const { data, error } = await supabase.from('pool_matches').insert({
+        tournament_id: tournament.id,
+        round_number: maxRound + 1,
+        match_number: maxMatch + 1,
+        table_number: 1,
+        player1_id: p1.id,
+        player2_id: p2.id,
+        is_bye: false,
+        is_silver_match: true,
+        status: 'pending',
+        winner_id: null,
+      }).select(MATCH_SELECT)
+
+      if (error) throw new Error(error.message)
+      const newMatch = normalizeMatch(data[0])
+      setMatches(prev => [...prev, newMatch])
+    } catch (e: any) {
+      alert('Error creating silver medal match: ' + e.message)
+    } finally {
+      setSilverCreating(false)
+    }
+  }
+
+  async function handleSilverWinner(player: Player) {
+    if (!silverMatch || selecting || silverMatch.status === 'complete') return
+    setSelecting(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('pool_matches')
+        .update({ winner_id: player.id, status: 'complete' })
+        .eq('id', silverMatch.id)
+      if (error) throw new Error(error.message)
+
+      await supabase
+        .from('pool_tournaments')
+        .update({ silver_winner_id: player.id })
+        .eq('id', tournament.id)
+
+      const updated: Match = { ...silverMatch, winner: player, status: 'complete' }
+      setMatches(prev => prev.map(m => m.id === silverMatch.id ? updated : m))
+      setStoredSilverWinner(player)
+    } catch (e: any) {
+      alert('Error recording silver medal winner: ' + e.message)
+    } finally {
+      setSelecting(false)
+    }
+  }
 
   async function spawnNextRound(
     supabase: ReturnType<typeof createClient>,
@@ -860,12 +949,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
 
     const { data, error } = await supabase
       .from('pool_matches').insert(rows)
-      .select(`
-        id, round_number, match_number, table_number, is_bye, status, winner_id,
-        player1:pool_players!pool_matches_player1_id_fkey(id, name),
-        player2:pool_players!pool_matches_player2_id_fkey(id, name),
-        winner:pool_players!pool_matches_winner_id_fkey(id, name)
-      `)
+      .select(MATCH_SELECT)
     if (error) throw new Error(error.message)
 
     // Normalise using the shared helper — winner field correctly populated from DB join
@@ -889,26 +973,27 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
         .update({ winner_id: null, status: 'pending' })
         .eq('id', match.id)
 
-      // Delete every match in rounds after this one — they'll be re-generated
+      // Delete silver playoff and any matches in later rounds
       await supabase
         .from('pool_matches')
         .delete()
         .eq('tournament_id', tournament.id)
-        .gt('round_number', match.roundNumber)
+        .or(`round_number.gt.${match.roundNumber},is_silver_match.eq.true`)
 
       // If the tournament was marked complete, revert it to active
       await supabase
         .from('pool_tournaments')
-        .update({ status: 'active' })
+        .update({ status: 'active', silver_winner_id: null })
         .eq('id', tournament.id)
         .eq('status', 'complete')
 
       // Update local state
       setMatches(prev =>
         prev
-          .filter(m => m.roundNumber <= match.roundNumber)
+          .filter(m => m.roundNumber <= match.roundNumber && !m.isSilverMatch)
           .map(m => m.id === match.id ? { ...m, winner: null, status: 'pending' } : m)
       )
+      setStoredSilverWinner(null)
       setTimeout(() => setSvgKey(k => k + 1), 80)
     } catch (e: any) {
       alert('Error resetting result: ' + e.message)
@@ -972,12 +1057,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
           .from('pool_matches')
           .update({ player2_id: player.id, is_bye: false, status: 'pending', winner_id: null })
           .eq('id', existingBye.id)
-          .select(`
-            id, round_number, match_number, table_number, is_bye, status, winner_id,
-            player1:pool_players!pool_matches_player1_id_fkey(id, name),
-            player2:pool_players!pool_matches_player2_id_fkey(id, name),
-            winner:pool_players!pool_matches_winner_id_fkey(id, name)
-          `)
+          .select(MATCH_SELECT)
         if (ue) throw new Error(ue.message)
         const realMatch = normalizeMatch(updated[0])
         setMatches(prev => prev.map(m => m.id === existingBye.id ? realMatch : m))
@@ -1004,12 +1084,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
           is_bye:        false,
           status:        'pending',
           winner_id:     null,
-        }).select(`
-          id, round_number, match_number, table_number, is_bye, status, winner_id,
-          player1:pool_players!pool_matches_player1_id_fkey(id, name),
-          player2:pool_players!pool_matches_player2_id_fkey(id, name),
-          winner:pool_players!pool_matches_winner_id_fkey(id, name)
-        `)
+        }).select(MATCH_SELECT)
 
         if (error) throw new Error(error.message)
         const newMatch = normalizeMatch(data[0])
@@ -1055,12 +1130,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
         is_bye:        true,
         status:        'complete',
         winner_id:     queuedPlayer.id,
-      }).select(`
-        id, round_number, match_number, table_number, is_bye, status, winner_id,
-        player1:pool_players!pool_matches_player1_id_fkey(id, name),
-        player2:pool_players!pool_matches_player2_id_fkey(id, name),
-        winner:pool_players!pool_matches_winner_id_fkey(id, name)
-      `)
+      }).select(MATCH_SELECT)
 
       if (error) throw new Error(error.message)
       const newMatch = normalizeMatch(data[0])
@@ -1337,7 +1407,7 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
                       color: '#E8CC00', letterSpacing: '0.24em', marginBottom: 7,
                       textShadow: '0 0 20px rgba(232,204,0,0.6)',
                     }}>
-                      🏆 CHAMPION
+                      🏆 GOLD
                     </div>
                   )}
                   <div style={{
@@ -1362,6 +1432,154 @@ export function BracketView({ tournament, initialMatches, showReveal }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Gold & Silver medals */}
+      {phase === 'bracket' && champion && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, type: 'spring', stiffness: 240, damping: 24 }}
+          style={{
+            position: 'fixed', bottom: 22, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 35, display: 'flex', alignItems: 'center', gap: 20,
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 18px', borderRadius: 12,
+            background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(232,204,0,0.35)',
+          }}>
+            <span style={{ fontSize: 18 }}>🥇</span>
+            <div>
+              <div style={{ fontFamily: 'var(--font-jost)', fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', color: '#E8CC00' }}>GOLD</div>
+              <div style={{ fontFamily: 'var(--font-jost)', fontSize: 14, fontWeight: 800, color: 'white', textTransform: 'uppercase' }}>{champion.name}</div>
+            </div>
+          </div>
+          {silverMedalist ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 18px', borderRadius: 12,
+              background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(192,192,192,0.35)',
+            }}>
+              <span style={{ fontSize: 18 }}>🥈</span>
+              <div>
+                <div style={{ fontFamily: 'var(--font-jost)', fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', color: 'rgba(192,192,192,0.9)' }}>SILVER</div>
+                <div style={{ fontFamily: 'var(--font-jost)', fontSize: 14, fontWeight: 800, color: 'white', textTransform: 'uppercase' }}>{silverMedalist.name}</div>
+              </div>
+            </div>
+          ) : showSilverPlayoff ? (
+            <div style={{
+              padding: '10px 18px', borderRadius: 12,
+              background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(192,192,192,0.25)',
+              fontFamily: 'var(--font-jost)', fontSize: 11, fontWeight: 600,
+              color: 'rgba(255,255,255,0.5)', letterSpacing: '0.06em',
+            }}>
+              🥈 SILVER — playoff required
+            </div>
+          ) : null}
+        </motion.div>
+      )}
+
+      {/* Silver medal playoff panel */}
+      <AnimatePresence>
+        {phase === 'bracket' && champion && (showSilverPlayoff || silverPlayoffPending) && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            style={{
+              position: 'fixed', bottom: silverMedalist || !showSilverPlayoff ? 90 : 22,
+              left: '50%', transform: 'translateX(-50%)',
+              zIndex: 38, width: 'min(420px, 92vw)',
+              background: 'rgba(4,10,30,0.94)',
+              backdropFilter: 'blur(24px)',
+              border: '1px solid rgba(192,192,192,0.2)',
+              borderRadius: 18, padding: '22px 24px',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
+            }}
+          >
+            <div style={{
+              fontFamily: 'var(--font-jost)', fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.22em', color: 'rgba(192,192,192,0.7)', marginBottom: 6,
+            }}>
+              🥈 SILVER MEDAL PLAYOFF
+            </div>
+            <p style={{
+              fontFamily: 'var(--font-jost)', fontSize: 12, color: 'rgba(255,255,255,0.45)',
+              marginBottom: 16, lineHeight: 1.5,
+            }}>
+              Three finalists — run this match to decide 2nd place. The result counts on the season leaderboard.
+            </p>
+
+            {showSilverPlayoff && medals.playoffPlayers && (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  {medals.playoffPlayers.map(p => (
+                    <div key={p.id} style={{
+                      padding: '10px 14px', borderRadius: 8,
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      fontFamily: 'var(--font-jost)', fontWeight: 600, fontSize: 13,
+                      color: 'rgba(255,255,255,0.88)', textTransform: 'uppercase',
+                    }}>
+                      {p.name}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={handleCreateSilverMatch}
+                  disabled={silverCreating}
+                  style={{
+                    width: '100%', padding: '12px 16px', borderRadius: 10, border: 'none',
+                    background: 'linear-gradient(135deg, rgba(160,160,170,0.9) 0%, rgba(100,100,110,0.95) 100%)',
+                    fontFamily: 'var(--font-jost)', fontWeight: 800, fontSize: 12,
+                    letterSpacing: '0.12em', color: 'white', cursor: silverCreating ? 'wait' : 'pointer',
+                    opacity: silverCreating ? 0.7 : 1,
+                  }}
+                >
+                  {silverCreating ? 'CREATING…' : 'START SILVER MEDAL MATCH'}
+                </button>
+              </>
+            )}
+
+            {silverPlayoffPending && silverMatch?.player1 && silverMatch?.player2 && (
+              <div>
+                <p style={{
+                  fontFamily: 'var(--font-jost)', fontSize: 11, color: 'rgba(255,255,255,0.4)',
+                  marginBottom: 12, textAlign: 'center', letterSpacing: '0.06em',
+                }}>
+                  Tap the winner
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[silverMatch.player1, silverMatch.player2].map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSilverWinner(p)}
+                      disabled={selecting}
+                      style={{
+                        padding: '14px 16px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)',
+                        background: 'rgba(6,14,42,0.78)', cursor: selecting ? 'wait' : 'pointer',
+                        fontFamily: 'var(--font-jost)', fontWeight: 700, fontSize: 14,
+                        color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase',
+                        textAlign: 'left', transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!selecting) (e.currentTarget.style.background = 'rgba(25,100,170,0.85)') }}
+                      onMouseLeave={e => { (e.currentTarget.style.background = 'rgba(6,14,42,0.78)') }}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hints */}
       {phase === 'bracket' && !champion && (

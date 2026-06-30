@@ -14,8 +14,8 @@ async function getLeaderboard() {
     { data: tournaments },
   ] = await Promise.all([
     supabase.from('pool_players').select('id, name'),
-    supabase.from('pool_matches').select('player1_id, player2_id, winner_id, tournament_id, round_number, status, is_bye'),
-    supabase.from('pool_tournaments').select('id, status'),
+    supabase.from('pool_matches').select('player1_id, player2_id, winner_id, tournament_id, round_number, status, is_bye, is_silver_match'),
+    supabase.from('pool_tournaments').select('id, status, silver_winner_id'),
   ])
 
   if (!players) return []
@@ -24,10 +24,17 @@ async function getLeaderboard() {
     (tournaments ?? []).filter(t => t.status === 'complete').map(t => t.id)
   )
 
-  // Find tournament winner: winner of the highest-round match in a completed tournament
+  // Gold: winner of the grand final (exclude silver playoff matches from round calc)
   const winnerByTournament = new Map<string, string>()
+  const silverByTournament = new Map<string, string>()
+  for (const t of tournaments ?? []) {
+    if (t.status !== 'complete') continue
+    if (t.silver_winner_id) silverByTournament.set(t.id, t.silver_winner_id)
+  }
   for (const tid of completedIds) {
-    const tMatches = (matches ?? []).filter(m => m.tournament_id === tid && m.status === 'complete' && !m.is_bye)
+    const tMatches = (matches ?? []).filter(
+      m => m.tournament_id === tid && m.status === 'complete' && !m.is_bye && !m.is_silver_match,
+    )
     if (!tMatches.length) continue
     const maxRound = Math.max(...tMatches.map(m => m.round_number))
     const finals = tMatches.filter(m => m.round_number === maxRound)
@@ -43,12 +50,13 @@ async function getLeaderboard() {
     const gamesWon  = played.filter(m => m.winner_id === player.id).length
     const gamesLost = played.filter(m => m.winner_id !== player.id).length
     const compWins  = [...winnerByTournament.values()].filter(w => w === player.id).length
+    const silverFinishes = [...silverByTournament.values()].filter(w => w === player.id).length
 
-    return { id: player.id, name: player.name, compWins, gamesWon, gamesLost }
+    return { id: player.id, name: player.name, compWins, silverFinishes, gamesWon, gamesLost }
   })
 
   return stats
-    .filter(s => s.gamesWon + s.gamesLost > 0 || s.compWins > 0)
+    .filter(s => s.gamesWon + s.gamesLost > 0 || s.compWins > 0 || s.silverFinishes > 0)
     .sort((a, b) => {
       if (b.compWins  !== a.compWins)  return b.compWins  - a.compWins
       if (b.gamesWon  !== a.gamesWon)  return b.gamesWon  - a.gamesWon
@@ -198,6 +206,11 @@ export default async function PoolLeaderboardPage() {
                     {row.compWins > 0 && (
                       <span style={{ marginLeft: 8, fontSize: '0.75rem', color: '#E8CC00' }}>
                         {'★'.repeat(Math.min(row.compWins, 5))}
+                      </span>
+                    )}
+                    {row.silverFinishes > 0 && (
+                      <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'rgba(192,192,192,0.9)' }}>
+                        {'🥈'.repeat(Math.min(row.silverFinishes, 5))}
                       </span>
                     )}
                   </div>
