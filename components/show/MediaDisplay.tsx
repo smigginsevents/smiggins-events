@@ -47,8 +47,9 @@ export function MediaDisplay({ mediaType, mediaUrl }: Props) {
   }
 
   if (mediaType === 'audio') {
-    // Play the audio silently — visual indicator is handled by the parent display screen
-    return <audio autoPlay src={mediaUrl} className="hidden" />
+    // Return null — audio questions on the display screen render their own
+    // large visual player inline (see display/page.tsx question section)
+    return null
   }
 
   return null

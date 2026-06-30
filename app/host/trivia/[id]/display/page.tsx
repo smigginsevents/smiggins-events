@@ -603,21 +603,39 @@ export default function DisplayPage() {
               )}
             </div>
 
-            {/* Audio visual indicator */}
+            {/* Audio — large visual + full playable player */}
             {question.media_type === 'audio' && question.media_url && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.7 }}
+                initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5, ease: 'backOut' }}
-                className="flex flex-col items-center"
+                className="flex flex-col items-center gap-6 w-full"
               >
+                {/* Pulsing music note */}
                 <motion.div
-                  animate={{ scale: [1, 1.06, 1], opacity: [0.7, 1, 0.7] }}
+                  animate={{ scale: [1, 1.06, 1], opacity: [0.6, 1, 0.6] }}
                   transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
-                  style={{ fontSize: 'clamp(5rem, 12vw, 14rem)', lineHeight: 1 }}
+                  style={{ fontSize: 'clamp(4rem, 10vw, 12rem)', lineHeight: 1 }}
                 >
                   🎵
                 </motion.div>
+
+                {/* Playable audio player — styled for TV visibility */}
+                <div style={{
+                  background: 'rgba(255,255,255,0.12)',
+                  borderRadius: 16,
+                  padding: '16px 24px',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                }}>
+                  <audio
+                    key={question.media_url}
+                    controls
+                    autoPlay
+                    src={question.media_url}
+                    style={{ width: 'clamp(280px, 45vw, 700px)', height: 48 }}
+                  />
+                </div>
               </motion.div>
             )}
 
