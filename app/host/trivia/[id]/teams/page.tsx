@@ -12,13 +12,12 @@ function Background() {
     <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/Pool-Comp-webBG.jpg" alt=""
+        src="/Einstein-in-the-mountains.jpg" alt=""
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
       />
-      {/* Trivia overlay — deeper, warmer tint to distinguish from Pool Comp */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: 'linear-gradient(155deg, rgba(18,6,38,0.85) 0%, rgba(8,4,28,0.80) 100%)',
+        background: 'linear-gradient(155deg, rgba(18,6,38,0.82) 0%, rgba(8,4,28,0.76) 100%)',
       }} />
     </div>
   )
