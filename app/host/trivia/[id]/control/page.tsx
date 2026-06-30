@@ -230,6 +230,26 @@ export default function ControlPage() {
     router.push('/host')
   }
 
+  async function resetEvent() {
+    if (!confirm('Reset to lobby? This clears ALL scores and teams but keeps your questions.')) return
+    const supabase = createClient()
+    await Promise.all([
+      supabase.from('trivia_scores').delete().eq('event_id', eventId),
+      supabase.from('trivia_event_teams').delete().eq('event_id', eventId),
+      supabase.from('trivia_events').update({ status: 'ready' }).eq('id', eventId),
+    ])
+    await updateLiveState(eventId, {
+      phase: 'lobby',
+      current_round_id: null,
+      current_question_id: null,
+      timer_started_at: null,
+      leaderboard_revealed: false,
+      marking_question_index: 0,
+      marking_revealed: false,
+    })
+    router.refresh()
+  }
+
   async function saveScore(teamId: string, roundId: string, pts: number) {
     const supabase = createClient()
     await supabase.from('trivia_scores').upsert(
@@ -291,6 +311,7 @@ export default function ControlPage() {
           <a href={`/host/trivia/${eventId}/display`} target="_blank" rel="noopener noreferrer">
             <Button variant="ghost" size="sm">Display ↗</Button>
           </a>
+          <Button variant="ghost" size="sm" onClick={resetEvent} title="Reset to lobby — clears scores & teams, keeps questions">↺ Reset</Button>
           <Button variant="danger" size="sm" onClick={endEvent}>End</Button>
         </div>
       </div>

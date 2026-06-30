@@ -21,6 +21,36 @@ export function TriviaEventRow({ id, name, eventDate, status }: Props) {
   const router = useRouter()
   const [confirm, setConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+
+  async function handleReset() {
+    setResetting(true)
+    try {
+      const supabase = createClient()
+      await Promise.all([
+        supabase.from('trivia_scores').delete().eq('event_id', id),
+        supabase.from('trivia_event_teams').delete().eq('event_id', id),
+        supabase.from('trivia_events').update({ status: 'ready' }).eq('id', id),
+      ])
+      await supabase.from('trivia_live_state').update({
+        phase: 'lobby',
+        current_round_id: null,
+        current_question_id: null,
+        timer_started_at: null,
+        leaderboard_revealed: false,
+        marking_question_index: 0,
+        marking_revealed: false,
+        updated_at: new Date().toISOString(),
+      }).eq('event_id', id)
+      router.refresh()
+    } catch (e: any) {
+      alert('Reset failed: ' + e.message)
+    } finally {
+      setResetting(false)
+      setConfirmReset(false)
+    }
+  }
 
   const date = new Date(eventDate).toLocaleDateString('en-AU', {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
@@ -90,6 +120,37 @@ export function TriviaEventRow({ id, name, eventDate, status }: Props) {
           <Link href={`/host/trivia/${id}/questions`}>
             <Button size="sm" variant="ghost">{status === 'draft' ? 'Edit' : 'View'}</Button>
           </Link>
+        )}
+
+        {/* Reset with inline confirmation */}
+        {confirmReset ? (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-amber-700 font-medium whitespace-nowrap">
+              Clear scores &amp; teams?
+            </span>
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded px-2 py-0.5 transition-colors disabled:opacity-60"
+            >
+              {resetting ? '…' : 'Reset'}
+            </button>
+            <button
+              onClick={() => setConfirmReset(false)}
+              disabled={resetting}
+              className="text-xs text-amber-400 hover:text-amber-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmReset(true)}
+            title="Reset event — clears scores and teams, keeps questions"
+            className="text-xs text-navy/25 hover:text-amber-500 transition-colors px-1.5 py-1 rounded"
+          >
+            ↺
+          </button>
         )}
 
         {/* Delete with inline confirmation */}
