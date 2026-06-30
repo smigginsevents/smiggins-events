@@ -311,7 +311,18 @@ export default function QuestionsPage() {
     if (q.id) {
       await supabase.from('trivia_questions').delete().eq('id', q.id)
     }
-    setQuestions(prev => ({ ...prev, [roundId]: (prev[roundId] ?? []).filter((_, i) => i !== idx) }))
+
+    // Renumber remaining questions sequentially and sync to DB
+    const remaining = (questions[roundId] ?? []).filter((_, i) => i !== idx)
+    const renumbered = remaining.map((item, i) => ({ ...item, question_number: i + 1 }))
+    setQuestions(prev => ({ ...prev, [roundId]: renumbered }))
+
+    // Update any whose number changed
+    await Promise.all(
+      renumbered
+        .filter((item, i) => item.id && remaining[i].question_number !== item.question_number)
+        .map(item => supabase.from('trivia_questions').update({ question_number: item.question_number }).eq('id', item.id!))
+    )
   }
 
   async function markReady() {
