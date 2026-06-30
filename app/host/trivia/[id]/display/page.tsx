@@ -537,8 +537,56 @@ export default function DisplayPage() {
           </motion.div>
         )}
 
-        {/* ── QUESTION ────────────────────────────────────────────────────────── */}
-        {(phase === 'question' || phase === 'timer_running') && question && (
+        {/* ── QUESTION — fullscreen image mode ──────────────────────────────── */}
+        {(phase === 'question' || phase === 'timer_running') && question &&
+          liveState?.media_fullscreen && question.media_type === 'image' && question.media_url && (
+          <motion.div
+            key={`question-${question.id}-fullscreen`}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 z-10"
+          >
+            {/* Image fills the screen */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={question.media_url}
+              alt=""
+              className="absolute inset-0 w-full h-full"
+              style={{ objectFit: 'contain', background: '#0a0a1a' }}
+            />
+
+            {/* Top bar — round + Q indicator */}
+            <div className="absolute top-6 left-0 right-0 px-10 flex items-center justify-between z-20"
+              style={{ background: 'linear-gradient(to bottom, rgba(22,45,90,0.7) 0%, transparent 100%)', paddingBottom: 32 }}
+            >
+              <div className="flex items-center gap-3">
+                {currentRound && (
+                  <span className="bg-rust text-white font-display text-lg px-4 py-1.5 rounded-full">
+                    ROUND {currentRound.round_number}
+                  </span>
+                )}
+                <span className="text-white/60 font-display text-xl">Q{question.question_number}</span>
+              </div>
+              {phase === 'timer_running' && (
+                <div style={{ width: 160 }}>
+                  <TimerBar timerStartedAt={liveState!.timer_started_at} durationSeconds={timerDuration} />
+                </div>
+              )}
+            </div>
+
+            {/* Question text at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 z-20 px-12 py-6 text-center"
+              style={{ background: 'linear-gradient(to top, rgba(12,25,70,0.92) 0%, transparent 100%)' }}
+            >
+              <p className="text-white font-semibold" style={{ fontSize: 'clamp(1.2rem, 2.2vw, 3rem)', lineHeight: 1.3 }}>
+                {question.question_text}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── QUESTION — normal mode ───────────────────────────────────────────── */}
+        {(phase === 'question' || phase === 'timer_running') && question && !liveState?.media_fullscreen && (
           <motion.div key={`question-${question.id}`} {...slide} transition={{ duration: 0.4 }}
             className="absolute inset-0 flex flex-col items-center justify-center z-10 px-16 gap-6"
           >
@@ -589,7 +637,6 @@ export default function DisplayPage() {
 
             <MediaDisplay mediaType={question.media_type} mediaUrl={question.media_url} />
 
-            {/* Timer */}
             {phase === 'timer_running' && (
               <div className="w-full max-w-xs">
                 <TimerBar timerStartedAt={liveState!.timer_started_at} durationSeconds={timerDuration} />

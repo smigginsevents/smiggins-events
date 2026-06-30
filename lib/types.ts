@@ -83,6 +83,7 @@ export interface TriviaLiveState {
   leaderboard_revealed: boolean
   marking_question_index: number
   marking_revealed: boolean
+  media_fullscreen: boolean
   updated_at: string
 }
 

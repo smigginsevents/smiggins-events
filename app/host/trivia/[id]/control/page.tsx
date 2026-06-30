@@ -170,6 +170,7 @@ export default function ControlPage() {
       current_question_id: question.id,
       phase: 'question',
       timer_started_at: null,
+      media_fullscreen: false,
     }))
   }
 
@@ -181,7 +182,11 @@ export default function ControlPage() {
   }
 
   async function revealAnswer() {
-    await act(() => updateLiveState(eventId, { phase: 'answer_reveal', timer_started_at: null }))
+    await act(() => updateLiveState(eventId, { phase: 'answer_reveal', timer_started_at: null, media_fullscreen: false }))
+  }
+
+  async function toggleMediaFullscreen() {
+    await act(() => updateLiveState(eventId, { media_fullscreen: !liveState?.media_fullscreen }))
   }
 
   async function endRound() {
@@ -456,6 +461,20 @@ export default function ControlPage() {
                   <p className="text-xs text-pine/60 uppercase font-semibold tracking-wider mb-1">Answer</p>
                   <p className="text-pine font-semibold">{currentQuestion.answer_text}</p>
                 </div>
+
+                {/* Fullscreen image toggle — shown when question has an image */}
+                {currentQuestion?.media_type === 'image' && currentQuestion?.media_url && (
+                  <div className="mb-3">
+                    <Button
+                      variant={liveState?.media_fullscreen ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={toggleMediaFullscreen}
+                      loading={busy}
+                    >
+                      {liveState?.media_fullscreen ? '⊡ Shrink Image' : '⊞ Fullscreen Image'}
+                    </Button>
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-3">
                   {phase === 'question' && <Button onClick={startTimer} loading={busy}>▶ Start Timer</Button>}
