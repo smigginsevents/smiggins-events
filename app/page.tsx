@@ -96,7 +96,7 @@ const ORIGINS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Ball
 // ─────────────────────────────────────────────────────────────────────────────
-const BS = 64  // ball diameter in px
+const BS = 96  // ball diameter in px
 const CIRC = Math.PI * BS   // ~201 px per rotation
 
 function PoolBall({ hue }: { hue: 'orange' | 'yellow' }) {
@@ -250,7 +250,7 @@ function PoolWordAnimation() {
 
   const letterSx: React.CSSProperties = {
     fontFamily: 'var(--font-jost)',
-    fontSize: 'clamp(3.6rem, 8.5vw, 5.2rem)',
+    fontSize: 'clamp(5.4rem, 12.75vw, 7.8rem)',
     fontWeight: 900, color: 'white',
     letterSpacing: '-0.02em', lineHeight: 1,
   }
@@ -290,7 +290,7 @@ function PoolWordAnimation() {
 
       {/* COMP */}
       <motion.div animate={compCtrl} initial={{ opacity: 0, y: 18 }} style={{
-        fontFamily: 'var(--font-jost)', fontSize: 'clamp(1.8rem, 5vw, 2.8rem)',
+        fontFamily: 'var(--font-jost)', fontSize: 'clamp(2.7rem, 7.5vw, 4.2rem)',
         fontWeight: 900, color: 'white', letterSpacing: '0.2em', lineHeight: 1, marginTop: 3,
       }}>COMP</motion.div>
 
@@ -299,7 +299,19 @@ function PoolWordAnimation() {
         <div className="h-px bg-white/10 mb-4 w-28 mx-auto" />
         <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>Starts 8:30pm</p>
         <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>in the Smiggins Hotel bar</p>
-        <Link href="/pool" className="hover:text-white/70 transition-colors" style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: 10, display: 'inline-block' }}>Leaderboard →</Link>
+        <Link href="/pool" style={{
+          display: 'inline-block', marginTop: 12,
+          padding: '9px 28px',
+          background: 'rgba(255,255,255,0.15)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          borderRadius: 999,
+          fontFamily: 'var(--font-jost)', fontSize: '0.82rem', fontWeight: 700,
+          color: 'white', letterSpacing: '0.06em', textDecoration: 'none',
+          transition: 'background 0.2s',
+        }}
+        onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+        onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+        >Leaderboard →</Link>
       </motion.div>
     </div>
   )
@@ -374,20 +386,20 @@ export default function HomePage() {
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.55, delay: 2.1 }}
-                style={{ width: 168, height: 175, overflow: 'hidden' }}
+                style={{ width: 110, height: 115, overflow: 'hidden' }}
               >
                 <Image
                   src="/questionmark.png"
                   alt=""
                   height={268}
                   width={168}
-                  style={{ display: 'block', opacity: 0.93 }}
+                  style={{ display: 'block', opacity: 0.93, width: 110, height: 'auto' }}
                   priority
                 />
               </motion.div>
 
-              {/* Natural dot-gap — same visual weight as real ? typography */}
-              <div style={{ height: 22 }} />
+              {/* Natural dot-gap */}
+              <div style={{ height: 14 }} />
 
               {/* 4 Pines logo as the dot */}
               <motion.div
@@ -395,7 +407,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.45, delay: 2.4, ease: [0.22, 0.61, 0.36, 1] }}
               >
-                <Image src="/4Pines_Logo_Colour_circle.png" alt="4 Pines Brewing" width={88} height={88} className="object-contain drop-shadow-xl" />
+                <Image src="/4Pines_Logo_Colour_circle.png" alt="4 Pines Brewing" width={68} height={68} className="object-contain drop-shadow-xl" />
               </motion.div>
             </div>
 
@@ -403,11 +415,10 @@ export default function HomePage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 2.3 }}
-              className="px-5 pt-3 pb-2 text-center" style={{ lineHeight: 0.88 }}
+              className="px-5 pt-3 pb-2 text-center" style={{ lineHeight: 0.95 }}
             >
-              {['TRIVIA','TUESDAY'].map(w => (
-                <div key={w} className="text-white font-black uppercase" style={{ fontFamily: 'var(--font-jost)', fontSize: 'clamp(2.8rem, 8vw, 5.2rem)', letterSpacing: '-0.02em' }}>{w}</div>
-              ))}
+              <div style={{ fontFamily: 'var(--font-jost)', fontWeight: 900, color: 'white', fontSize: 'clamp(3rem, 9vw, 5.6rem)', letterSpacing: '-0.02em', lineHeight: 1 }}>TRIVIA</div>
+              <div style={{ fontFamily: 'var(--font-jost)', fontWeight: 900, color: '#C8722A', fontSize: 'clamp(1.1rem, 3.2vw, 1.9rem)', letterSpacing: '0.3em', lineHeight: 1, marginTop: 4 }}>TUESDAY</div>
             </motion.div>
 
             <motion.div
@@ -418,7 +429,19 @@ export default function HomePage() {
               <div className="h-px bg-white/10 mb-4" />
               <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>Starts 9:00pm</p>
               <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>in the Smiggins Hotel bar</p>
-              <Link href="/trivia" className="hover:text-white/70 transition-colors" style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: 10, display: 'inline-block' }}>Leaderboard →</Link>
+              <Link href="/trivia" style={{
+                display: 'inline-block', marginTop: 12,
+                padding: '9px 28px',
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 999,
+                fontFamily: 'var(--font-jost)', fontSize: '0.82rem', fontWeight: 700,
+                color: 'white', letterSpacing: '0.06em', textDecoration: 'none',
+                transition: 'background 0.2s',
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+              onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+              >Leaderboard →</Link>
             </motion.div>
           </motion.div>
 
