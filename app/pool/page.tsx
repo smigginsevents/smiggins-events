@@ -149,11 +149,11 @@ export default async function PoolLeaderboardPage() {
             <p className="text-sm">Check back after Monday night!</p>
           </div>
         ) : (
-          <div className="w-full rounded-2xl overflow-hidden" style={{ background: 'rgba(4,10,30,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="w-full rounded-2xl overflow-hidden" style={{ background: 'rgba(4,10,30,0.22)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }}>
             {/* Column headers */}
             <div className="grid px-5 py-3" style={{
               gridTemplateColumns: '56px 1fr 110px 90px 90px',
-              background: 'rgba(0,0,0,0.28)',
+              background: 'rgba(0,0,0,0.15)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
               {['Rank', 'Player', 'Comp Wins', 'Won', 'Lost'].map(h => (
