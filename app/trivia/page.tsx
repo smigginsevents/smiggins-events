@@ -99,15 +99,14 @@ export default async function TriviaLeaderboardPage() {
         ) : (
           <div className="w-full rounded-2xl overflow-hidden" style={{ background: 'rgba(4,10,30,0.22)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }}>
             {/* Column headers */}
-            <div className="grid px-5 py-3" style={{
-              gridTemplateColumns: '56px 1fr 110px 110px',
+            <div className="grid lb-grid-trivia px-3 py-3 sm:px-5" style={{
               background: 'rgba(0,0,0,0.15)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
-              {['Rank', 'Team', 'Night Wins', 'Points'].map(h => (
+              {['Rank', 'Team', 'Wins', 'Points'].map(h => (
                 <div key={h} className="text-center first:text-left" style={{
-                  fontFamily: 'var(--font-jost)', fontSize: '0.7rem', fontWeight: 700,
-                  color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-jost)', fontSize: '0.65rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase',
                 }}>{h}</div>
               ))}
             </div>
@@ -122,9 +121,8 @@ export default async function TriviaLeaderboardPage() {
               return (
                 <div
                   key={row.id}
-                  className="grid items-center px-5 py-4"
+                  className="grid lb-grid-trivia items-center px-3 py-3 sm:px-5 sm:py-4"
                   style={{
-                    gridTemplateColumns: '56px 1fr 110px 110px',
                     background: rowBg,
                     borderBottom: idx < rows.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                   }}
@@ -133,7 +131,7 @@ export default async function TriviaLeaderboardPage() {
                   <div className="flex items-center">
                     <span style={{
                       fontFamily: 'var(--font-jost)',
-                      fontSize: isTop3 ? '2rem' : '1.4rem',
+                      fontSize: isTop3 ? 'clamp(1.3rem, 4vw, 2rem)' : 'clamp(1rem, 3vw, 1.4rem)',
                       fontWeight: 900,
                       color: isTop3 ? 'white' : 'rgba(255,255,255,0.5)',
                       lineHeight: 1,
@@ -145,14 +143,17 @@ export default async function TriviaLeaderboardPage() {
                   {/* Team name */}
                   <div style={{
                     fontFamily: 'var(--font-jost)',
-                    fontSize: '0.95rem',
+                    fontSize: 'clamp(0.7rem, 2.2vw, 0.95rem)',
                     fontWeight: isTop3 ? 700 : 500,
                     color: 'white',
                     textTransform: 'uppercase',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}>
                     {row.name}
                     {row.nightWins > 0 && (
-                      <span style={{ marginLeft: 8, fontSize: '0.75rem', color: '#E8CC00' }}>
+                      <span style={{ marginLeft: 6, fontSize: '0.7rem', color: '#E8CC00' }}>
                         {'★'.repeat(Math.min(row.nightWins, 5))}
                       </span>
                     )}
@@ -160,7 +161,7 @@ export default async function TriviaLeaderboardPage() {
 
                   {/* Night Wins */}
                   <div className="text-center" style={{
-                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontFamily: 'var(--font-jost)', fontSize: 'clamp(0.8rem, 2.5vw, 1rem)',
                     fontWeight: 700, color: row.nightWins > 0 ? '#E8CC00' : 'rgba(255,255,255,0.5)',
                   }}>
                     {row.nightWins}
@@ -168,7 +169,7 @@ export default async function TriviaLeaderboardPage() {
 
                   {/* Total Points */}
                   <div className="text-center" style={{
-                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontFamily: 'var(--font-jost)', fontSize: 'clamp(0.8rem, 2.5vw, 1rem)',
                     fontWeight: 600, color: 'rgba(255,255,255,0.85)',
                   }}>
                     {row.totalPoints}

@@ -39,6 +39,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Leaderboard responsive grid — mobile-first, widens at sm (640px) */
+.lb-grid-pool {
+  grid-template-columns: 32px 1fr 64px 46px 46px;
+}
+@media (min-width: 640px) {
+  .lb-grid-pool {
+    grid-template-columns: 56px 1fr 110px 90px 90px;
+  }
+}
+
+.lb-grid-trivia {
+  grid-template-columns: 32px 1fr 64px 64px;
+}
+@media (min-width: 640px) {
+  .lb-grid-trivia {
+    grid-template-columns: 56px 1fr 110px 110px;
+  }
+}
+
 /* Show screen overrides — applied when <html> has data-show="true" */
 [data-show="true"] body {
   background-color: var(--color-navy);

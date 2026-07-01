@@ -151,15 +151,14 @@ export default async function PoolLeaderboardPage() {
         ) : (
           <div className="w-full rounded-2xl overflow-hidden" style={{ background: 'rgba(4,10,30,0.22)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }}>
             {/* Column headers */}
-            <div className="grid px-5 py-3" style={{
-              gridTemplateColumns: '56px 1fr 110px 90px 90px',
+            <div className="grid lb-grid-pool px-3 py-3 sm:px-5" style={{
               background: 'rgba(0,0,0,0.15)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
-              {['Rank', 'Player', 'Comp Wins', 'Won', 'Lost'].map(h => (
+              {['Rank', 'Player', 'Wins', 'Won', 'Lost'].map(h => (
                 <div key={h} className="text-center first:text-left" style={{
-                  fontFamily: 'var(--font-jost)', fontSize: '0.7rem', fontWeight: 700,
-                  color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-jost)', fontSize: '0.65rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase',
                 }}>{h}</div>
               ))}
             </div>
@@ -174,9 +173,8 @@ export default async function PoolLeaderboardPage() {
               return (
                 <div
                   key={row.id}
-                  className="grid items-center px-5 py-4"
+                  className="grid lb-grid-pool items-center px-3 py-3 sm:px-5 sm:py-4"
                   style={{
-                    gridTemplateColumns: '56px 1fr 110px 90px 90px',
                     background: rowBg,
                     borderBottom: idx < rows.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                   }}
@@ -185,7 +183,7 @@ export default async function PoolLeaderboardPage() {
                   <div className="flex items-center">
                     <span style={{
                       fontFamily: 'var(--font-jost)',
-                      fontSize: isTop3 ? '2rem' : '1.4rem',
+                      fontSize: isTop3 ? 'clamp(1.3rem, 4vw, 2rem)' : 'clamp(1rem, 3vw, 1.4rem)',
                       fontWeight: 900,
                       color: isTop3 ? 'white' : 'rgba(255,255,255,0.5)',
                       lineHeight: 1,
@@ -197,19 +195,22 @@ export default async function PoolLeaderboardPage() {
                   {/* Player name */}
                   <div style={{
                     fontFamily: 'var(--font-jost)',
-                    fontSize: '0.95rem',
+                    fontSize: 'clamp(0.7rem, 2.2vw, 0.95rem)',
                     fontWeight: isTop3 ? 700 : 500,
                     color: 'white',
                     textTransform: 'uppercase',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}>
                     {row.name}
                     {row.compWins > 0 && (
-                      <span style={{ marginLeft: 8, fontSize: '0.75rem', color: '#E8CC00' }}>
+                      <span style={{ marginLeft: 6, fontSize: '0.7rem', color: '#E8CC00' }}>
                         {'★'.repeat(Math.min(row.compWins, 5))}
                       </span>
                     )}
                     {row.silverFinishes > 0 && (
-                      <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'rgba(192,192,192,0.9)' }}>
+                      <span style={{ marginLeft: 4, fontSize: '0.7rem', color: 'rgba(192,192,192,0.9)' }}>
                         {'🥈'.repeat(Math.min(row.silverFinishes, 5))}
                       </span>
                     )}
@@ -217,7 +218,7 @@ export default async function PoolLeaderboardPage() {
 
                   {/* Comp Wins */}
                   <div className="text-center" style={{
-                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontFamily: 'var(--font-jost)', fontSize: 'clamp(0.8rem, 2.5vw, 1rem)',
                     fontWeight: 700, color: row.compWins > 0 ? '#E8CC00' : 'rgba(255,255,255,0.5)',
                   }}>
                     {row.compWins}
@@ -225,7 +226,7 @@ export default async function PoolLeaderboardPage() {
 
                   {/* Games Won */}
                   <div className="text-center" style={{
-                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontFamily: 'var(--font-jost)', fontSize: 'clamp(0.8rem, 2.5vw, 1rem)',
                     fontWeight: 600, color: 'rgba(255,255,255,0.85)',
                   }}>
                     {row.gamesWon}
@@ -233,7 +234,7 @@ export default async function PoolLeaderboardPage() {
 
                   {/* Games Lost */}
                   <div className="text-center" style={{
-                    fontFamily: 'var(--font-jost)', fontSize: '1rem',
+                    fontFamily: 'var(--font-jost)', fontSize: 'clamp(0.8rem, 2.5vw, 1rem)',
                     fontWeight: 400, color: 'rgba(255,255,255,0.45)',
                   }}>
                     {row.gamesLost}
