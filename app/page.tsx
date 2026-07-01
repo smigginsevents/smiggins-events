@@ -96,7 +96,7 @@ const ORIGINS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Ball
 // ─────────────────────────────────────────────────────────────────────────────
-const BS = 96  // ball diameter in px
+const BS = 76  // ball diameter in px
 const CIRC = Math.PI * BS   // ~201 px per rotation
 
 function PoolBall({ hue }: { hue: 'orange' | 'yellow' }) {
@@ -250,13 +250,15 @@ function PoolWordAnimation() {
 
   const letterSx: React.CSSProperties = {
     fontFamily: 'var(--font-jost)',
-    fontSize: 'clamp(5.4rem, 12.75vw, 7.8rem)',
+    fontSize: 'clamp(4.3rem, 10.2vw, 6.2rem)',
     fontWeight: 900, color: 'white',
     letterSpacing: '-0.02em', lineHeight: 1,
   }
 
   return (
     <div className="flex flex-col items-center w-full px-6 py-8 flex-1" style={{ gap: 0, overflow: 'visible' }}>
+      {/* Branding centred in the space above the footer */}
+      <div className="flex-1 flex flex-col items-center justify-center" style={{ overflow: 'visible' }}>
       {/* MONDAY */}
       <motion.div animate={monCtrl} initial={{ opacity: 0, y: -16 }} style={{
         fontFamily: 'var(--font-jost)', fontSize: 'clamp(0.7rem, 2vw, 0.9rem)',
@@ -290,12 +292,13 @@ function PoolWordAnimation() {
 
       {/* COMP */}
       <motion.div animate={compCtrl} initial={{ opacity: 0, y: 18 }} style={{
-        fontFamily: 'var(--font-jost)', fontSize: 'clamp(2.7rem, 7.5vw, 4.2rem)',
+        fontFamily: 'var(--font-jost)', fontSize: 'clamp(2.2rem, 6vw, 3.4rem)',
         fontWeight: 900, color: 'white', letterSpacing: '0.2em', lineHeight: 1, marginTop: 3,
       }}>COMP</motion.div>
+      </div>{/* end centring wrapper */}
 
       {/* footer */}
-      <motion.div animate={footCtrl} initial={{ opacity: 0 }} className="text-center mt-auto w-full">
+      <motion.div animate={footCtrl} initial={{ opacity: 0 }} className="text-center w-full">
         <div className="h-px bg-white/10 mb-4" />
         <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>Starts 8:30pm</p>
         <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>in the Smiggins Hotel bar</p>
