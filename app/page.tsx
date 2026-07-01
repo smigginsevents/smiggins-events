@@ -256,7 +256,7 @@ function PoolWordAnimation() {
   }
 
   return (
-    <div className="flex flex-col items-center w-full px-6 py-8" style={{ gap: 0, overflow: 'visible' }}>
+    <div className="flex flex-col items-center w-full px-6 py-8 flex-1" style={{ gap: 0, overflow: 'visible' }}>
       {/* MONDAY */}
       <motion.div animate={monCtrl} initial={{ opacity: 0, y: -16 }} style={{
         fontFamily: 'var(--font-jost)', fontSize: 'clamp(0.7rem, 2vw, 0.9rem)',
@@ -295,8 +295,8 @@ function PoolWordAnimation() {
       }}>COMP</motion.div>
 
       {/* footer */}
-      <motion.div animate={footCtrl} initial={{ opacity: 0 }} className="text-center mt-6 w-full">
-        <div className="h-px bg-white/10 mb-4 w-28 mx-auto" />
+      <motion.div animate={footCtrl} initial={{ opacity: 0 }} className="text-center mt-auto w-full">
+        <div className="h-px bg-white/10 mb-4" />
         <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>Starts 8:30pm</p>
         <p style={{ fontFamily: 'var(--font-jost)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>in the Smiggins Hotel bar</p>
         <Link href="/pool" style={{
@@ -356,7 +356,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, x: -60 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.65, delay: 1.6, ease: [0.22, 0.61, 0.36, 1] }}
-            className="relative rounded-3xl overflow-hidden flex flex-col items-center justify-center"
+            className="relative rounded-3xl overflow-hidden flex flex-col"
             style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.12)' }}
           >
             <PoolWordAnimation />
