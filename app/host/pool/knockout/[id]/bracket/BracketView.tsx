@@ -22,6 +22,12 @@ function normalizeMatch(m: any): Match {
   }
 }
 
+// The player who advances out of a match — the recorded winner, or the lone
+// player of a bye match whose winner join hasn't populated.
+function advancerOf(m: { winner: Player | null; isBye: boolean; player1: Player | null }): Player | null {
+  return m.winner ?? (m.isBye ? m.player1 : null)
+}
+
 const MATCH_SELECT = `
   id, round_number, match_number, table_number, is_bye, is_silver_match, status, winner_id,
   player1:pool_players!pool_matches_player1_id_fkey(id, name),
@@ -106,18 +112,79 @@ function buildLayout(matches: Match[]) {
 
   const r1Count  = (byRound[rounds[0]] ?? []).length
   const maxRound = rounds[rounds.length - 1]
-  const isDouble = r1Count >= 8
+
+  // Double-sided layout demands a perfect power-of-two bracket: every round
+  // exactly halves, and every match's players are the winners of the two
+  // matches directly beside it in the previous round. Anything else — byes
+  // after round 1, late-arrival matches, odd player counts — renders
+  // single-sided, where positions and lines follow actual player provenance.
+  const isPow2 = (n: number) => n >= 2 && (n & (n - 1)) === 0
+  let isDouble = r1Count >= 8 && isPow2(r1Count)
+  if (isDouble) {
+    for (let k = 1; k < rounds.length && isDouble; k++) {
+      if (rounds[k] !== rounds[0] + k || (byRound[rounds[k]]?.length ?? 0) !== r1Count >> k) {
+        isDouble = false
+        break
+      }
+      const prev = [...byRound[rounds[k - 1]]].sort((a, b) => a.matchNumber - b.matchNumber)
+      const cur  = [...byRound[rounds[k]]].sort((a, b) => a.matchNumber - b.matchNumber)
+      for (let i = 0; i < cur.length; i++) {
+        const a = advancerOf(prev[i * 2])
+        const b = advancerOf(prev[i * 2 + 1])
+        const ids = new Set([cur[i].player1?.id, cur[i].player2?.id])
+        if (!a || !b || !ids.has(a.id) || !ids.has(b.id)) { isDouble = false; break }
+      }
+    }
+  }
 
   const layout: LayoutMatch[] = []
 
   if (!isDouble) {
     // ── Single-sided (standard left-to-right) ─────────────────────────────
+    // Round 1 stacks in draw order. Every later round is placed by
+    // provenance: each match sits at the average height of the matches its
+    // players actually won, so connector lines always tell the truth — even
+    // when byes or late arrivals break the perfect bracket shape.
+    let prevRound: LayoutMatch[] = []
     for (const round of rounds) {
       const rMatches = [...(byRound[round] ?? [])].sort((a, b) => a.matchNumber - b.matchNumber)
-      const slotsPerMatch = Math.pow(2, round - 1)
-      rMatches.forEach((m, i) => {
-        layout.push({ ...m, indexInRound: i, centerY: (i + 0.5) * slotsPerMatch * SLOT_H, x: (round - 1) * ROUND_W, side: 'left', cardW: CARD_W, cardH: CARD_H, vsGap: VS_GAP, colGap: COL_GAP })
+
+      if (round === rounds[0]) {
+        prevRound = rMatches.map((m, i) => ({
+          ...m, indexInRound: i, centerY: (i + 0.5) * SLOT_H, x: (round - 1) * ROUND_W,
+          side: 'left' as const, cardW: CARD_W, cardH: CARD_H, vsGap: VS_GAP, colGap: COL_GAP,
+        }))
+        layout.push(...prevRound)
+        continue
+      }
+
+      const placed = rMatches.map(m => {
+        const sources = prevRound.filter(pm => {
+          const adv = advancerOf(pm)
+          return !!adv && (adv.id === m.player1?.id || adv.id === m.player2?.id)
+        })
+        const desiredY = sources.length > 0
+          ? sources.reduce((sum, pm) => sum + pm.centerY, 0) / sources.length
+          : Number.POSITIVE_INFINITY   // unknown origin (late-arrival pair) → bottom
+        return { m, desiredY }
       })
+      placed.sort((a, b) => (a.desiredY - b.desiredY) || (a.m.matchNumber - b.m.matchNumber))
+
+      const roundLayout: LayoutMatch[] = []
+      let prevY = Number.NEGATIVE_INFINITY
+      placed.forEach(({ m, desiredY }, i) => {
+        const fallbackY = isFinite(prevY) ? prevY + SLOT_H : 0.5 * SLOT_H
+        const centerY = isFinite(desiredY)
+          ? Math.max(desiredY, isFinite(prevY) ? prevY + SLOT_H : desiredY)
+          : fallbackY
+        roundLayout.push({
+          ...m, indexInRound: i, centerY, x: (round - 1) * ROUND_W,
+          side: 'left', cardW: CARD_W, cardH: CARD_H, vsGap: VS_GAP, colGap: COL_GAP,
+        })
+        prevY = centerY
+      })
+      layout.push(...roundLayout)
+      prevRound = roundLayout
     }
     const maxCY = layout.length > 0 ? Math.max(...layout.map(m => m.centerY)) : SLOT_H
     const totalH = maxCY + CARD_H + VS_GAP / 2 + MATCH_GAP
@@ -125,16 +192,14 @@ function buildLayout(matches: Match[]) {
     return { layout, rounds, r1Count, totalH, totalW, isDouble }
   }
 
-  // ── Double-sided (for 16+ players) ─────────────────────────────────────
-  // Left side:   first ceil(N/2) matches per round, growing rightward toward center.
+  // ── Double-sided (verified power-of-two brackets only) ─────────────────
+  // Left side:   first half of each round's matches, growing rightward toward center.
   // Right side:  remaining matches, mirrored — growing leftward toward center.
   // Grand final: single match centered between the two sides.
   //
-  // Winners from spawnNextRound are sorted by matchNumber of their source match.
-  // Left R1 matches always get lower matchNumbers than right R1 matches (generated
-  // in one batch), so the first-half split by sorted index is stable across all
-  // subsequent rounds — left R1 winners pair with each other, creating left R2
-  // matches with the lowest matchNumbers in that round, and so on.
+  // The eligibility check above guarantees every round halves cleanly and each
+  // match's players are the winners of the two adjacent matches before it, so
+  // the index-based half split and pairing below are always truthful here.
 
   // Use stable expectedMaxRound derived from r1Count only — geometry never shifts
   // as new rounds are added to the DB mid-tournament.
@@ -207,24 +272,47 @@ function buildLinesSingle(layout: LayoutMatch[]): Line[] {
   }
   const rounds = Object.keys(byRound).map(Number).sort((a, b) => a - b)
 
-  for (let ri = 0; ri < rounds.length - 1; ri++) {
-    const cur    = rounds[ri]
-    const next   = rounds[ri + 1]
-    const curMs  = [...(byRound[cur]  ?? [])].sort((a, b) => a.indexInRound - b.indexInRound)
-    const nextMs = [...(byRound[next] ?? [])].sort((a, b) => a.indexInRound - b.indexInRound)
-    const delay  = 0.15 + ri * 0.35
+  // Connect every match to the matches its players actually came from —
+  // never by index assumption — so the lines stay truthful even when byes
+  // or late arrivals disturb the bracket order.
+  for (let ri = 1; ri < rounds.length; ri++) {
+    const prevMs = byRound[rounds[ri - 1]] ?? []
+    const curMs  = [...(byRound[rounds[ri]] ?? [])].sort((a, b) => a.indexInRound - b.indexInRound)
+    const delay  = 0.15 + (ri - 1) * 0.35
 
-    for (let ni = 0; ni < nextMs.length; ni++) {
-      const m1 = curMs[ni * 2]; const m2 = curMs[ni * 2 + 1]; const parent = nextMs[ni]
-      if (!parent || !m1) continue
-      const rightX = m1.x + m1.cardW; const midX = rightX + m1.colGap / 2
-      if (m2) {
-        lines.push({ key: `elbow-${cur}-${ni}`,   d: `M ${rightX} ${m1.centerY} H ${midX} V ${m2.centerY} H ${rightX}`, delay })
-        lines.push({ key: `connect-${next}-${ni}`, d: `M ${midX} ${parent.centerY} H ${parent.x}`, delay: delay + 0.18 })
+    curMs.forEach((parent, pi) => {
+      const sources = prevMs
+        .filter(pm => {
+          const adv = advancerOf(pm)
+          return !!adv && (adv.id === parent.player1?.id || adv.id === parent.player2?.id)
+        })
+        .sort((a, b) => a.centerY - b.centerY)
+      if (sources.length === 0) return   // late-arrival pair — no origin to draw
+
+      const s1     = sources[0]
+      const rightX = s1.x + s1.cardW
+      if (sources.length >= 2) {
+        const s2   = sources[sources.length - 1]
+        const midX = rightX + s1.colGap / 2
+        const top  = Math.min(s1.centerY, parent.centerY)
+        const bot  = Math.max(s2.centerY, parent.centerY)
+        lines.push({
+          key: `elbow-${rounds[ri]}-${pi}`,
+          d: `M ${rightX} ${s1.centerY} H ${midX} M ${rightX} ${s2.centerY} H ${midX} M ${midX} ${top} V ${bot}`,
+          delay,
+        })
+        lines.push({ key: `connect-${rounds[ri]}-${pi}`, d: `M ${midX} ${parent.centerY} H ${parent.x}`, delay: delay + 0.18 })
       } else {
-        lines.push({ key: `single-${cur}-${ni}`, d: `M ${rightX} ${m1.centerY} H ${parent.x}`, delay })
+        // Single origin (bye carry-through) — bend later in the gap so the
+        // vertical can't sit on top of a neighbouring elbow's join.
+        const midX = rightX + s1.colGap * 0.72
+        lines.push({
+          key: `single-${rounds[ri]}-${pi}`,
+          d: `M ${rightX} ${s1.centerY} H ${midX} V ${parent.centerY} H ${parent.x}`,
+          delay,
+        })
       }
-    }
+    })
   }
   // Champion stub line
   const lastRound = rounds[rounds.length - 1]
@@ -911,24 +999,30 @@ export function BracketView({ tournament, initialMatches, initialSilverWinner, s
     const maxMatch  = Math.max(...currentMatches.map(m => m.matchNumber))
     const nextRound = completedRound + 1
 
-    // If odd number of winners, determine who gets the bye.
-    // Prefer a player who did NOT already have a bye in a previous round,
-    // so the same player doesn't get two byes. If everyone has had a bye,
-    // pick the last winner (standard practice).
-    let orderedWinners = [...winners]
+    // Winners stay in bracket order so winners of neighbouring matches always
+    // meet. With an odd count, the bye goes to the leftover LAST winner —
+    // every other pairing stays adjacent. If that player already had a bye in
+    // an earlier round, swap them with the nearest earlier winner who hasn't:
+    // the smallest possible disturbance to the order. (Never reorder from the
+    // front — that shifts every pairing and scrambles the bracket.)
+    const orderedWinners = [...winners]
     if (orderedWinners.length % 2 !== 0) {
       const prevByeIds = new Set(
         currentMatches
-          .filter(m => m.isBye && m.winner)
-          .map(m => m.winner!.id)
+          .filter(m => m.isBye)
+          .map(m => (m.winner ?? m.player1)?.id)
+          .filter((id): id is string => !!id)
       )
-      // Find first winner who has NOT had a bye and move them to the end (bye slot)
-      const noPrevByeIdx = orderedWinners.findIndex(w => !prevByeIds.has(w.id))
-      if (noPrevByeIdx !== -1) {
-        const [byePlayer] = orderedWinners.splice(noPrevByeIdx, 1)
-        orderedWinners.push(byePlayer)
+      const last = orderedWinners.length - 1
+      if (prevByeIds.has(orderedWinners[last].id)) {
+        for (let j = last - 1; j >= 0; j--) {
+          if (!prevByeIds.has(orderedWinners[j].id)) {
+            ;[orderedWinners[j], orderedWinners[last]] = [orderedWinners[last], orderedWinners[j]]
+            break
+          }
+        }
+        // If everyone has had a bye, the last winner gets another (unavoidable).
       }
-      // else: everyone has had a bye — last player gets another (unavoidable)
     }
 
     const rows = []
