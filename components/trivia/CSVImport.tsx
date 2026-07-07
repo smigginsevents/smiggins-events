@@ -13,7 +13,64 @@ interface CSVRow {
   question_text: string
   answer_text: string
   media_url?: string
+  media_type?: string
   points?: string
+  option_a?: string
+  option_b?: string
+  option_c?: string
+  option_d?: string
+  correct_option?: string
+}
+
+const MEDIA_TYPES = ['none', 'image', 'audio', 'video'] as const
+
+// Explicit media_type column wins; otherwise infer image from a URL.
+// A media_type without a URL is valid — the builder shows the upload
+// slot so media can be added after import.
+function parseMediaType(row: CSVRow): { mediaType: string | null; error: string | null } {
+  const raw = (row.media_type ?? '').trim().toLowerCase()
+  if (!raw) return { mediaType: null, error: null }
+  if (!(MEDIA_TYPES as readonly string[]).includes(raw)) {
+    return { mediaType: null, error: `media_type "${row.media_type}" isn't one of ${MEDIA_TYPES.join('/')}` }
+  }
+  return { mediaType: raw, error: null }
+}
+
+// Reads option_a–option_d off a row. 2+ filled options ⇒ multiple choice.
+// correct index comes from the correct_option column (A–D or 1–4), falling
+// back to a case-insensitive match of answer_text against the options.
+function parseMultipleChoice(row: CSVRow): {
+  options: string[] | null
+  correctIndex: number | null
+  error: string | null
+} {
+  const raw = [row.option_a, row.option_b, row.option_c, row.option_d]
+    .map((o) => (o ?? '').trim())
+  const options = raw.filter(Boolean)
+  if (options.length === 0) return { options: null, correctIndex: null, error: null }
+  if (options.length === 1) {
+    return { options: null, correctIndex: null, error: 'only 1 option filled — need 2–4 for multiple choice' }
+  }
+
+  let correctIndex: number | null = null
+  const marker = (row.correct_option ?? '').trim().toUpperCase()
+  if (marker) {
+    const letterIdx = ['A', 'B', 'C', 'D'].indexOf(marker)
+    const numIdx = /^[1-4]$/.test(marker) ? Number(marker) - 1 : -1
+    const rawIdx = letterIdx >= 0 ? letterIdx : numIdx
+    if (rawIdx < 0 || !raw[rawIdx]) {
+      return { options, correctIndex: null, error: `correct_option "${row.correct_option}" doesn't point at a filled option` }
+    }
+    // index within the compacted list (in case a middle option was left blank)
+    correctIndex = raw.slice(0, rawIdx).filter(Boolean).length
+  } else {
+    const answer = (row.answer_text ?? '').trim().toLowerCase()
+    correctIndex = options.findIndex((o) => o.toLowerCase() === answer)
+    if (correctIndex < 0) {
+      return { options, correctIndex: null, error: 'set correct_option to A/B/C/D, or make answer_text exactly match one option' }
+    }
+  }
+  return { options, correctIndex, error: null }
 }
 
 interface Props {
@@ -41,6 +98,10 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
           if (!row.round_number) errs.push(`Row ${i + 1}: missing round_number`)
           if (!row.question_text) errs.push(`Row ${i + 1}: missing question_text`)
           if (!row.answer_text) errs.push(`Row ${i + 1}: missing answer_text`)
+          const mc = parseMultipleChoice(row)
+          if (mc.error) errs.push(`Row ${i + 1}: ${mc.error}`)
+          const media = parseMediaType(row)
+          if (media.error) errs.push(`Row ${i + 1}: ${media.error}`)
         })
         setErrors(errs)
         setPreview(result.data)
@@ -62,15 +123,20 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
     const roundMap: Record<number, string> = {}
     rounds.forEach((r) => { roundMap[r.round_number] = r.id })
 
-    const toInsert = preview.map((row) => ({
-      round_id: roundMap[Number(row.round_number)],
-      question_number: Number(row.question_number) || 1,
-      question_text: row.question_text,
-      answer_text: row.answer_text,
-      media_url: row.media_url || null,
-      media_type: row.media_url ? 'image' : 'none',
-      points: Number(row.points) || 1,
-    })).filter((q) => q.round_id)
+    const toInsert = preview.map((row) => {
+      const mc = parseMultipleChoice(row)
+      return {
+        round_id: roundMap[Number(row.round_number)],
+        question_number: Number(row.question_number) || 1,
+        question_text: row.question_text,
+        answer_text: row.answer_text,
+        media_url: row.media_url || null,
+        media_type: parseMediaType(row).mediaType ?? (row.media_url ? 'image' : 'none'),
+        points: Number(row.points) || 1,
+        multiple_choice_options: mc.options,
+        correct_option_index: mc.correctIndex,
+      }
+    }).filter((q) => q.round_id)
 
     await supabase.from('trivia_questions').insert(toInsert)
 
@@ -84,7 +150,13 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-timber uppercase tracking-wider">Import from CSV</h2>
         <a
-          href="data:text/csv;charset=utf-8,round_number,question_number,question_text,answer_text,media_url,points%0A1,1,Question here,Answer here,,1"
+          href={'data:text/csv;charset=utf-8,' + encodeURIComponent(
+            'round_number,question_number,question_text,answer_text,media_url,media_type,points,option_a,option_b,option_c,option_d,correct_option\n' +
+            '1,1,Open question here,Answer here,,,1,,,,,\n' +
+            '1,2,Multiple choice question here,Option B text,,,1,Option A text,Option B text,Option C text,Option D text,B\n' +
+            '1,3,TRUE or FALSE: statement here,FALSE,,,1,True,False,,,B\n' +
+            '1,4,Media question here (add the file or URL after import),Answer here,,audio,1,,,,,\n'
+          )}
           download="trivia-template.csv"
           className="text-xs text-rust hover:underline"
         >
@@ -92,8 +164,14 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
         </a>
       </div>
 
+      <p className="text-xs text-navy/50 mb-2">
+        Expected columns: <code className="bg-snow px-1 py-0.5 rounded">round_number, question_number, question_text, answer_text, media_url, media_type, points, option_a, option_b, option_c, option_d, correct_option</code>
+      </p>
+      <p className="text-xs text-navy/50 mb-2">
+        Fill in 2–4 of <code className="bg-snow px-1 py-0.5 rounded">option_a</code>–<code className="bg-snow px-1 py-0.5 rounded">option_d</code> to make a question multiple choice — it&apos;s detected automatically. True/false is just multiple choice with options <code className="bg-snow px-1 py-0.5 rounded">True</code> and <code className="bg-snow px-1 py-0.5 rounded">False</code>. Mark the right answer with <code className="bg-snow px-1 py-0.5 rounded">correct_option</code> (A–D), or leave it blank if <code className="bg-snow px-1 py-0.5 rounded">answer_text</code> exactly matches one of the options.
+      </p>
       <p className="text-xs text-navy/50 mb-4">
-        Expected columns: <code className="bg-snow px-1 py-0.5 rounded">round_number, question_number, question_text, answer_text, media_url, points</code>
+        For media questions, set <code className="bg-snow px-1 py-0.5 rounded">media_type</code> to <code className="bg-snow px-1 py-0.5 rounded">image</code>, <code className="bg-snow px-1 py-0.5 rounded">audio</code> or <code className="bg-snow px-1 py-0.5 rounded">video</code>. You can leave <code className="bg-snow px-1 py-0.5 rounded">media_url</code> blank and upload the file (or paste a URL) here after importing.
       </p>
 
       <input
@@ -130,20 +208,46 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
                   <th className="text-left px-3 py-2 text-timber">Q</th>
                   <th className="text-left px-3 py-2 text-timber">Question</th>
                   <th className="text-left px-3 py-2 text-timber">Answer</th>
+                  <th className="text-left px-3 py-2 text-timber">Type</th>
                 </tr>
               </thead>
               <tbody>
-                {preview.slice(0, 10).map((row, i) => (
-                  <tr key={i} className="border-b border-timber/10">
-                    <td className="px-3 py-2 text-navy/60">{row.round_number}</td>
-                    <td className="px-3 py-2 text-navy/60">{row.question_number}</td>
-                    <td className="px-3 py-2 text-navy truncate max-w-xs">{row.question_text}</td>
-                    <td className="px-3 py-2 text-navy truncate max-w-xs">{row.answer_text}</td>
-                  </tr>
-                ))}
+                {preview.slice(0, 10).map((row, i) => {
+                  const mc = parseMultipleChoice(row)
+                  const mediaType = parseMediaType(row).mediaType ?? (row.media_url ? 'image' : 'none')
+                  const isTrueFalse = mc.options?.length === 2 &&
+                    mc.options.every((o) => ['true', 'false'].includes(o.toLowerCase()))
+                  return (
+                    <tr key={i} className="border-b border-timber/10">
+                      <td className="px-3 py-2 text-navy/60">{row.round_number}</td>
+                      <td className="px-3 py-2 text-navy/60">{row.question_number}</td>
+                      <td className="px-3 py-2 text-navy truncate max-w-xs">{row.question_text}</td>
+                      <td className="px-3 py-2 text-navy truncate max-w-xs">{row.answer_text}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {isTrueFalse ? (
+                          <span className="text-rust font-medium">
+                            T/F ✓{(mc.correctIndex ?? 0) === 0 ? 'True' : 'False'}
+                          </span>
+                        ) : mc.options ? (
+                          <span className="text-rust font-medium">
+                            MC ({mc.options.length}) ✓{['A', 'B', 'C', 'D'][mc.correctIndex ?? 0]}
+                          </span>
+                        ) : (
+                          <span className="text-navy/40">Open</span>
+                        )}
+                        {mediaType !== 'none' && (
+                          <span className="ml-1 text-navy/60">
+                            {mediaType === 'audio' ? '🎵' : mediaType === 'video' ? '▶' : '🖼️'}
+                            {!row.media_url && ' (add media)'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
                 {preview.length > 10 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-2 text-navy/40 text-center">
+                    <td colSpan={5} className="px-3 py-2 text-navy/40 text-center">
                       …and {preview.length - 10} more
                     </td>
                   </tr>
