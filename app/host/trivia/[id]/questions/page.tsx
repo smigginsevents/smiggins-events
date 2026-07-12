@@ -25,7 +25,7 @@ function MediaSection({
   idx: number
   eventId: string
   onUpdate: (field: string, value: string | null) => void
-  onSave: () => void
+  onSave: (patch?: Partial<QuestionDraft>) => void
 }) {
   const [uploading, setUploading] = useState(false)
   const [mode, setMode] = useState<'url' | 'upload'>(q.media_storage_path ? 'upload' : 'url')
@@ -53,7 +53,9 @@ function MediaSection({
       const { data: { publicUrl } } = supabase.storage.from('trivia-media').getPublicUrl(path)
       onUpdate('media_url', publicUrl)
       onUpdate('media_storage_path', path)
-      onSave()
+      // Pass the new values explicitly — the state updates above haven't
+      // flushed yet, so a plain onSave() would persist a stale question
+      onSave({ media_url: publicUrl, media_storage_path: path })
     } catch (err: any) {
       alert('Upload failed: ' + err.message)
     } finally {
@@ -68,7 +70,7 @@ function MediaSection({
     await supabase.storage.from('trivia-media').remove([q.media_storage_path])
     onUpdate('media_url', null)
     onUpdate('media_storage_path', null)
-    onSave()
+    onSave({ media_url: null, media_storage_path: null })
     setMode('url')
   }
 
@@ -86,7 +88,7 @@ function MediaSection({
             placeholder={q.media_type === 'video' ? 'YouTube URL' : 'https://…'}
             value={q.media_url ?? ''}
             onChange={e => onUpdate('media_url', e.target.value)}
-            onBlur={onSave}
+            onBlur={() => onSave()}
             className="flex-1 text-xs"
           />
         )}
@@ -132,7 +134,7 @@ function MultipleChoiceSection({
 }: {
   q: QuestionDraft
   onUpdate: (field: string, value: any) => void
-  onSave: () => void
+  onSave: (patch?: Partial<QuestionDraft>) => void
 }) {
   const options = q.multiple_choice_options ?? ['', '', '', '']
   const labels = ['A', 'B', 'C', 'D']
@@ -156,14 +158,14 @@ function MultipleChoiceSection({
               type="text"
               value={options[i] ?? ''}
               onChange={e => setOption(i, e.target.value)}
-              onBlur={onSave}
+              onBlur={() => onSave()}
               placeholder={`Option ${label}`}
               className="flex-1 rounded border border-timber/30 px-2 py-1 text-xs text-navy bg-snow-card focus:outline-none focus:ring-1 focus:ring-rust"
             />
             <button
               type="button"
               title="Mark as correct"
-              onClick={() => { onUpdate('correct_option_index', i); onSave() }}
+              onClick={() => { onUpdate('correct_option_index', i); onSave({ correct_option_index: i }) }}
               className={`text-xs px-1.5 py-1 rounded transition-colors ${q.correct_option_index === i ? 'bg-pine text-white' : 'text-navy/30 hover:text-pine'}`}
             >
               ✓
@@ -227,9 +229,13 @@ export default function QuestionsPage() {
     })
   }
 
-  async function saveQuestion(roundId: string, idx: number) {
-    const q = questions[roundId]?.[idx]
-    if (!q || !q.dirty) return
+  async function saveQuestion(roundId: string, idx: number, patch?: Partial<QuestionDraft>) {
+    const base = questions[roundId]?.[idx]
+    if (!base) return
+    // A patch carries values that were just set but may not have flushed to
+    // state yet (e.g. media upload) — merge it and always treat as dirty
+    const q = patch ? { ...base, ...patch, dirty: true } : base
+    if (!q.dirty) return
     if (!q.question_text.trim() || !q.answer_text.trim()) return
 
     const key = `${roundId}-${idx}`
@@ -496,7 +502,7 @@ export default function QuestionsPage() {
                   <MultipleChoiceSection
                     q={q}
                     onUpdate={(field, value) => updateQuestion(round.id, idx, field, value)}
-                    onSave={() => saveQuestion(round.id, idx)}
+                    onSave={patch => saveQuestion(round.id, idx, patch)}
                   />
                 )}
 
@@ -506,10 +512,14 @@ export default function QuestionsPage() {
                     <select
                       value={q.media_type}
                       onChange={e => {
-                        updateQuestion(round.id, idx, 'media_type', e.target.value as MediaType)
-                        if (e.target.value === 'none') {
+                        const mediaType = e.target.value as MediaType
+                        updateQuestion(round.id, idx, 'media_type', mediaType)
+                        if (mediaType === 'none') {
                           updateQuestion(round.id, idx, 'media_url', null)
                           updateQuestion(round.id, idx, 'media_storage_path', null)
+                          saveQuestion(round.id, idx, { media_type: mediaType, media_url: null, media_storage_path: null })
+                        } else {
+                          saveQuestion(round.id, idx, { media_type: mediaType })
                         }
                       }}
                       className="text-xs border border-timber/30 rounded px-2 py-1 bg-snow-card text-navy"
@@ -528,7 +538,7 @@ export default function QuestionsPage() {
                   <MediaSection
                     q={q} roundId={round.id} idx={idx} eventId={eventId}
                     onUpdate={(field, value) => updateQuestion(round.id, idx, field, value)}
-                    onSave={() => saveQuestion(round.id, idx)}
+                    onSave={patch => saveQuestion(round.id, idx, patch)}
                   />
                 </div>
               </div>

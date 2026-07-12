@@ -478,8 +478,26 @@ export default function ControlPage() {
 
                 <div className="flex flex-wrap gap-3">
                   {phase === 'question' && <Button onClick={startTimer} loading={busy}>▶ Start Timer</Button>}
-                  {phase === 'question' && <Button variant="ghost" onClick={revealAnswer} loading={busy}>Skip to Answer</Button>}
-                  {phase === 'timer_running' && <Button onClick={revealAnswer} loading={busy}>Reveal Answer</Button>}
+                  {(phase === 'question' || phase === 'timer_running') && !isLastQuestion && (
+                    <Button
+                      variant={phase === 'timer_running' ? 'primary' : 'secondary'}
+                      onClick={() => { const q = currentRoundQuestions[currentQIdx + 1]; if (q) act(() => showQuestion(q)) }}
+                      loading={busy}
+                    >
+                      Next Question (Q{currentQIdx + 2}) →
+                    </Button>
+                  )}
+                  {(phase === 'question' || phase === 'timer_running') && isLastQuestion && (
+                    <Button
+                      variant={phase === 'timer_running' ? 'primary' : 'secondary'}
+                      onClick={endRound} loading={busy}
+                    >
+                      End Round {currentRound?.round_number} →
+                    </Button>
+                  )}
+                  {(phase === 'question' || phase === 'timer_running') && (
+                    <Button variant="ghost" onClick={revealAnswer} loading={busy}>Reveal Answer</Button>
+                  )}
                   {phase === 'answer_reveal' && !isLastQuestion && (
                     <Button onClick={() => { const q = currentRoundQuestions[currentQIdx + 1]; if (q) act(() => showQuestion(q)) }} loading={busy}>
                       Next Question (Q{currentQIdx + 2}) →
