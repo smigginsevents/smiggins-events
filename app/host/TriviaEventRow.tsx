@@ -4,9 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { duplicateTriviaEvent } from '@/lib/duplicateTriviaEvent'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import type { EventStatus } from '@/lib/types'
+
+function nextTuesday(): string {
+  const d = new Date()
+  const diff = (2 - d.getDay() + 7) % 7 || 7
+  d.setDate(d.getDate() + diff)
+  return d.toISOString().split('T')[0]
+}
 
 interface Props {
   id: string
@@ -23,6 +31,21 @@ export function TriviaEventRow({ id, name, eventDate, status }: Props) {
   const [deleting, setDeleting] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
+  const [duplicateDate, setDuplicateDate] = useState(nextTuesday)
+
+  async function handleDuplicate() {
+    setDuplicating(true)
+    try {
+      const newId = await duplicateTriviaEvent(id, duplicateDate)
+      router.push(`/host/trivia/${newId}/questions`)
+    } catch (e: any) {
+      alert('Duplicate failed: ' + e.message)
+      setDuplicating(false)
+      setConfirmDuplicate(false)
+    }
+  }
 
   async function handleReset() {
     setResetting(true)
@@ -120,6 +143,42 @@ export function TriviaEventRow({ id, name, eventDate, status }: Props) {
           <Link href={`/host/trivia/${id}/questions`}>
             <Button size="sm" variant="ghost">{status === 'draft' ? 'Edit' : 'View'}</Button>
           </Link>
+        )}
+
+        {/* Duplicate with inline date picker */}
+        {confirmDuplicate ? (
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-blue-700 font-medium whitespace-nowrap">Copy to:</span>
+            <input
+              type="date"
+              value={duplicateDate}
+              onChange={e => setDuplicateDate(e.target.value)}
+              disabled={duplicating}
+              className="text-xs text-blue-900 bg-white border border-blue-200 rounded px-1.5 py-0.5"
+            />
+            <button
+              onClick={handleDuplicate}
+              disabled={duplicating || !duplicateDate}
+              className="text-xs font-bold text-white bg-blue-500 hover:bg-blue-600 rounded px-2 py-0.5 transition-colors disabled:opacity-60"
+            >
+              {duplicating ? '…' : 'Duplicate'}
+            </button>
+            <button
+              onClick={() => setConfirmDuplicate(false)}
+              disabled={duplicating}
+              className="text-xs text-blue-400 hover:text-blue-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDuplicate(true)}
+            title="Duplicate event — copies all rounds, questions and media into a new draft"
+            className="text-xs text-navy/25 hover:text-blue-500 transition-colors px-1.5 py-1 rounded"
+          >
+            ⧉
+          </button>
         )}
 
         {/* Reset with inline confirmation */}
