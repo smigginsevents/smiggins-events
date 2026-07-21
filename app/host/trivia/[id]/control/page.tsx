@@ -462,6 +462,13 @@ export default function ControlPage() {
                   <p className="text-pine font-semibold">{currentQuestion.answer_text}</p>
                 </div>
 
+                {currentQuestion.host_comment && (
+                  <div className="bg-timber/5 border border-timber/20 rounded-lg px-4 py-3 mb-4">
+                    <p className="text-xs text-timber/60 uppercase font-semibold tracking-wider mb-1">Host note (not shown on display)</p>
+                    <p className="text-navy/80 text-sm">{currentQuestion.host_comment}</p>
+                  </div>
+                )}
+
                 {/* Fullscreen image toggle — shown when question has an image */}
                 {currentQuestion?.media_type === 'image' && currentQuestion?.media_url && (
                   <div className="mb-3">
@@ -576,6 +583,13 @@ export default function ControlPage() {
                     <div className="bg-pine/10 border border-pine/20 rounded-lg px-4 py-3 mb-3">
                       <p className="text-xs text-pine/60 uppercase font-semibold tracking-wider mb-1">Answer</p>
                       <p className="text-pine font-semibold">{currentMarkingQ.answer_text}</p>
+                    </div>
+                  )}
+
+                  {liveState?.marking_revealed && currentMarkingQ.host_comment && (
+                    <div className="bg-timber/5 border border-timber/20 rounded-lg px-4 py-3 mb-3">
+                      <p className="text-xs text-timber/60 uppercase font-semibold tracking-wider mb-1">Host note (not shown on display)</p>
+                      <p className="text-navy/80 text-sm">{currentMarkingQ.host_comment}</p>
                     </div>
                   )}
                 </div>

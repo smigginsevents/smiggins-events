@@ -48,6 +48,8 @@ export interface TriviaQuestion {
   question_number: number
   question_text: string
   answer_text: string
+  /** Host-only bonus knowledge to back up or embellish the answer. Never shown to players. */
+  host_comment: string | null
   multiple_choice_options: string[] | null
   correct_option_index: number | null
   media_type: MediaType
@@ -56,8 +58,8 @@ export interface TriviaQuestion {
   points: number
 }
 
-/** Safe version — answer_text excluded — for the public display screen */
-export type TriviaQuestionPublic = Omit<TriviaQuestion, 'answer_text'>
+/** Safe version — answer_text and host_comment excluded — for the public display screen */
+export type TriviaQuestionPublic = Omit<TriviaQuestion, 'answer_text' | 'host_comment'>
 
 export interface TriviaEventTeam {
   id: string

@@ -247,6 +247,7 @@ export default function QuestionsPage() {
       question_number: q.question_number,
       question_text: q.question_text,
       answer_text: q.answer_text,
+      host_comment: q.host_comment ?? null,
       multiple_choice_options: q.multiple_choice_options ?? null,
       correct_option_index: q.correct_option_index ?? null,
       media_type: q.media_type,
@@ -296,6 +297,7 @@ export default function QuestionsPage() {
         question_number: existing.length + 1,
         question_text: '',
         answer_text: '',
+        host_comment: null,
         multiple_choice_options: null,
         correct_option_index: null,
         media_type: 'none' as MediaType,
@@ -476,6 +478,21 @@ export default function QuestionsPage() {
                       className="w-full rounded-md border border-timber/30 px-3 py-2 text-sm text-navy bg-snow-card resize-none focus:outline-none focus:ring-2 focus:ring-rust placeholder:text-navy/30"
                     />
                   </div>
+                </div>
+
+                {/* Host comment — bonus knowledge, host-only */}
+                <div className="mt-3">
+                  <label className="text-xs font-medium text-navy/60 mb-1 block">
+                    Host note <span className="text-navy/30 font-normal">(optional — only you see this, never shown on the display)</span>
+                  </label>
+                  <textarea
+                    value={q.host_comment ?? ''}
+                    onChange={e => updateQuestion(round.id, idx, 'host_comment', e.target.value || null)}
+                    onBlur={() => saveQuestion(round.id, idx)}
+                    placeholder="Extra knowledge to back up or embellish the answer when you reveal it…"
+                    rows={2}
+                    className="w-full rounded-md border border-timber/30 px-3 py-2 text-sm text-navy bg-snow-card resize-none focus:outline-none focus:ring-2 focus:ring-rust placeholder:text-navy/30"
+                  />
                 </div>
 
                 {/* Multiple choice toggle */}

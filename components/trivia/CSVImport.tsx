@@ -20,6 +20,7 @@ interface CSVRow {
   option_c?: string
   option_d?: string
   correct_option?: string
+  host_comment?: string
 }
 
 const MEDIA_TYPES = ['none', 'image', 'audio', 'video'] as const
@@ -135,6 +136,7 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
         points: Number(row.points) || 1,
         multiple_choice_options: mc.options,
         correct_option_index: mc.correctIndex,
+        host_comment: row.host_comment?.trim() || null,
       }
     }).filter((q) => q.round_id)
 
@@ -151,11 +153,11 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
         <h2 className="text-sm font-semibold text-timber uppercase tracking-wider">Import from CSV</h2>
         <a
           href={'data:text/csv;charset=utf-8,' + encodeURIComponent(
-            'round_number,question_number,question_text,answer_text,media_url,media_type,points,option_a,option_b,option_c,option_d,correct_option\n' +
-            '1,1,Open question here,Answer here,,,1,,,,,\n' +
-            '1,2,Multiple choice question here,Option B text,,,1,Option A text,Option B text,Option C text,Option D text,B\n' +
-            '1,3,TRUE or FALSE: statement here,FALSE,,,1,True,False,,,B\n' +
-            '1,4,Media question here (add the file or URL after import),Answer here,,audio,1,,,,,\n'
+            'round_number,question_number,question_text,answer_text,media_url,media_type,points,option_a,option_b,option_c,option_d,correct_option,host_comment\n' +
+            '1,1,Open question here,Answer here,,,1,,,,,,Bonus knowledge for the host to drop after the reveal\n' +
+            '1,2,Multiple choice question here,Option B text,,,1,Option A text,Option B text,Option C text,Option D text,B,Bonus knowledge for the host\n' +
+            '1,3,TRUE or FALSE: statement here,FALSE,,,1,True,False,,,B,Bonus knowledge for the host\n' +
+            '1,4,Media question here (add the file or URL after import),Answer here,,audio,1,,,,,,Bonus knowledge for the host\n'
           )}
           download="trivia-template.csv"
           className="text-xs text-rust hover:underline"
@@ -165,7 +167,10 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
       </div>
 
       <p className="text-xs text-navy/50 mb-2">
-        Expected columns: <code className="bg-snow px-1 py-0.5 rounded">round_number, question_number, question_text, answer_text, media_url, media_type, points, option_a, option_b, option_c, option_d, correct_option</code>
+        Expected columns: <code className="bg-snow px-1 py-0.5 rounded">round_number, question_number, question_text, answer_text, media_url, media_type, points, option_a, option_b, option_c, option_d, correct_option, host_comment</code>
+      </p>
+      <p className="text-xs text-navy/50 mb-2">
+        <code className="bg-snow px-1 py-0.5 rounded">host_comment</code> is optional bonus knowledge only you see — it shows up on the Control page while you&apos;re marking, and never reaches the display screen or players.
       </p>
       <p className="text-xs text-navy/50 mb-2">
         Fill in 2–4 of <code className="bg-snow px-1 py-0.5 rounded">option_a</code>–<code className="bg-snow px-1 py-0.5 rounded">option_d</code> to make a question multiple choice — it&apos;s detected automatically. True/false is just multiple choice with options <code className="bg-snow px-1 py-0.5 rounded">True</code> and <code className="bg-snow px-1 py-0.5 rounded">False</code>. Mark the right answer with <code className="bg-snow px-1 py-0.5 rounded">correct_option</code> (A–D), or leave it blank if <code className="bg-snow px-1 py-0.5 rounded">answer_text</code> exactly matches one of the options.
@@ -209,6 +214,7 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
                   <th className="text-left px-3 py-2 text-timber">Question</th>
                   <th className="text-left px-3 py-2 text-timber">Answer</th>
                   <th className="text-left px-3 py-2 text-timber">Type</th>
+                  <th className="text-left px-3 py-2 text-timber">Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -242,12 +248,15 @@ export function CSVImport({ eventId, rounds, onImported }: Props) {
                           </span>
                         )}
                       </td>
+                      <td className="px-3 py-2 text-navy/40">
+                        {row.host_comment?.trim() ? '📝' : ''}
+                      </td>
                     </tr>
                   )
                 })}
                 {preview.length > 10 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-2 text-navy/40 text-center">
+                    <td colSpan={6} className="px-3 py-2 text-navy/40 text-center">
                       …and {preview.length - 10} more
                     </td>
                   </tr>

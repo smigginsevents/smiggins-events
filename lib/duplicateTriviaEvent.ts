@@ -79,6 +79,7 @@ export async function duplicateTriviaEvent(sourceEventId: string, newDate: strin
       question_number: q.question_number,
       question_text: q.question_text,
       answer_text: q.answer_text,
+      host_comment: q.host_comment,
       multiple_choice_options: q.multiple_choice_options,
       correct_option_index: q.correct_option_index,
       media_type: q.media_type,
